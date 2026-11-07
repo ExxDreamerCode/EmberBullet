@@ -1,0 +1,24 @@
+[package]
+name = "ember-bullet-v2-trainer"
+version = "0.1.0"
+edition = "2024"
+description = "Trains Ember's NNUE v2 architecture with the bullet library and exports networks into Ember's V2 container format."
+license = "MIT"
+repository = "https://github.com/jw1912/bullet"
+
+[dependencies]
+bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet_lib" }
+bullet-compiler = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet-compiler" }
+bullet-trainer = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet-trainer", default-features = false }
+bulletformat = "1.8.0"
+sfbinpack = "0.6.4"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+
+[[bin]]
+name = "ember-bullet-v2-trainer"
+path = "src/main.rs"
+
