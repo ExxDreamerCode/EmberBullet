@@ -150,26 +150,30 @@ fn export_cmd(
 }
 
 fn ensure_container_sane(parsed: &crate::export::ParsedContainer) -> Result<()> {
-    ensure!(parsed.version == 0x6A448AFA, "bad version");
-    ensure!(parsed.arch_hash == 0x0256ACDF, "bad arch hash");
-    ensure!(parsed.num_stacks == 8, "bad stack count");
+    use crate::export::{
+        ARCH_HASH, EMBER_V2_VERSION, HIDDEN_SIZE, NUM_STACKS, PSQ_DIMS, PSQT_BUCKETS, THREAT_DIMS,
+    };
+
+    ensure!(parsed.version == EMBER_V2_VERSION, "bad version");
+    ensure!(parsed.arch_hash == ARCH_HASH, "bad arch hash");
+    ensure!(parsed.num_stacks == NUM_STACKS, "bad stack count");
     ensure!(
-        parsed.ft_bias.len() == 1024,
+        parsed.ft_bias.len() == HIDDEN_SIZE,
         "bad ft_bias length {}",
         parsed.ft_bias.len()
     );
     ensure!(
-        parsed.threat_weights.len() == 60_720 * 1024,
+        parsed.threat_weights.len() == THREAT_DIMS * HIDDEN_SIZE,
         "bad threat_weights length {}",
         parsed.threat_weights.len()
     );
     ensure!(
-        parsed.psq_weights.len() == 22_528 * 1024,
+        parsed.psq_weights.len() == PSQ_DIMS * HIDDEN_SIZE,
         "bad psq_weights length {}",
         parsed.psq_weights.len()
     );
     ensure!(
-        parsed.psqt.len() == 22_528 * 8,
+        parsed.psqt.len() == PSQ_DIMS * PSQT_BUCKETS,
         "bad psqt length {}",
         parsed.psqt.len()
     );
