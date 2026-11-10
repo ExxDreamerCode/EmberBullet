@@ -507,8 +507,8 @@ fn decode_signed_leb(data: &[u8], mut pos: usize) -> Result<(i64, usize)> {
         pos += 1;
         result |= (byte as i64 & 0x7f) << shift;
         if byte & 0x80 == 0 {
-            if byte & 0x40 != 0 && shift < 32 {
-                result |= !((1i64 << (shift + 7)) - 1);
+            if byte & 0x40 != 0 && shift < 63 {
+                result |= (-1i64) << (shift + 7);
             }
             return Ok((result, pos));
         }
@@ -548,5 +548,44 @@ mod tests {
     #[test]
     fn stack_bytes_constant() {
         assert_eq!(STACK_BYTES, 35208);
+    }
+
+    #[test]
+    fn sleb128_roundtrip_full_i64() {
+        let mut state = 0x243f_6a88_85a3_08d3u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            state as i64
+        };
+
+        let mut cases: Vec<i64> = vec![
+            0,
+            -1,
+            1,
+            i64::MIN,
+            i64::MAX,
+            -2,
+            -(1i64 << 31),
+            -(1i64 << 32),
+            -(1i64 << 35),
+            -(1i64 << 40),
+            -(1i64 << 56),
+            1i64 << 56,
+            i64::MIN + 1,
+        ];
+        for _ in 0..100_000 {
+            cases.push(next());
+        }
+
+        for v in cases {
+            let mut buf = Vec::new();
+            write_sleb128(v, &mut buf);
+            assert!(buf.len() <= 10, "value {v} encoded to {} bytes", buf.len());
+            let (decoded, end) = decode_signed_leb(&buf, 0).expect("decode {v}");
+            assert_eq!(end, buf.len());
+            assert_eq!(decoded, v, "sleb128 roundtrip failed for {v}");
+        }
     }
 }
