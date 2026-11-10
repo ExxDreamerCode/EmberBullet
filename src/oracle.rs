@@ -47,7 +47,9 @@ impl OracleBoard {
     }
 
     pub fn find_king(&self, perspective: u32) -> u32 {
-        self.bb[if perspective == 0 { 5 } else { 11 }].trailing_zeros()
+        let bb = self.bb[if perspective == 0 { 5 } else { 11 }];
+        debug_assert!(bb != 0, "no king for perspective {perspective}");
+        bb.trailing_zeros()
     }
 }
 
