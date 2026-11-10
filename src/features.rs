@@ -390,7 +390,7 @@ impl SparseInputType for EmberFullThreats {
     }
 
     fn max_active(&self) -> usize {
-        128
+        256
     }
 
     fn map_features<F: FnMut(usize, usize)>(&self, pos: &Self::RequiredDataType, f: F) {

@@ -11,7 +11,7 @@ pub const FT_OUTPUTS: usize = L1 + NUM_BUCKETS;
 pub const THREAT_DIMS: usize = 60_720;
 pub const HALKKA_DIMS: usize = 22_528;
 pub const COMBINED_INPUTS: usize = THREAT_DIMS + HALKKA_DIMS;
-const MAX_ACTIVE_THREATS: usize = 128;
+const MAX_ACTIVE_THREATS: usize = 256;
 const MAX_ACTIVE_HALKKA: usize = 32;
 const MAX_ACTIVE_COMBINED: usize = MAX_ACTIVE_THREATS + MAX_ACTIVE_HALKKA;
 
