@@ -5,8 +5,10 @@ use bullet_trainer::reader::{DataReader, ReadMapLoader};
 use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
 
 use crate::cli::TrainConfig;
-use crate::features::{EmberCombinedFeatures, COMBINED_DIMS};
-use crate::model::{L2, MAX_ACTIVE_COMBINED, NUM_BUCKETS, build_model, init_weights, saved_formats};
+use crate::features::{COMBINED_DIMS, EmberCombinedFeatures};
+use crate::model::{
+    L2, MAX_ACTIVE_COMBINED, NUM_BUCKETS, build_model, init_weights, saved_formats,
+};
 use crate::position::{BinpackReader, EmberPosition};
 
 #[cfg(feature = "cuda")]
@@ -27,7 +29,11 @@ impl DataReader<EmberPosition> for BinpackReader {
     }
 }
 
-fn make_loader(cfg: &TrainConfig, threads: u8, lambda: f32) -> ReadMapLoader<BinpackReader, EmberPosition> {
+fn make_loader(
+    cfg: &TrainConfig,
+    threads: u8,
+    lambda: f32,
+) -> ReadMapLoader<BinpackReader, EmberPosition> {
     let inputs = ModelInputs::default()
         .add_sparse("ft_stm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
         .add_sparse("ft_ntm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
@@ -41,36 +47,40 @@ fn make_loader(cfg: &TrainConfig, threads: u8, lambda: f32) -> ReadMapLoader<Bin
 
     let features = EmberCombinedFeatures::new();
 
-    let mapper = ModelInputsMapper::build(
-        &inputs,
-        move |pos: &EmberPosition,
-              _step: Step,
-              ((((((((stm, ntm), buckets), skip30), skip31), us), score), outcome), lambda_buf)| {
-            stm.fill(-1);
-            ntm.fill(-1);
+    let mapper =
+        ModelInputsMapper::build(
+            &inputs,
+            move |pos: &EmberPosition,
+                  _step: Step,
+                  (
+                (((((((stm, ntm), buckets), skip30), skip31), us), score), outcome),
+                lambda_buf,
+            )| {
+                stm.fill(-1);
+                ntm.fill(-1);
 
-            let mut stm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
-            let mut ntm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
-            features.collect(pos, &mut stm_idx, &mut ntm_idx);
-            ensure_nnz(stm_idx.len(), ntm_idx.len());
+                let mut stm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
+                let mut ntm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
+                features.collect(pos, &mut stm_idx, &mut ntm_idx);
+                ensure_nnz(stm_idx.len(), ntm_idx.len());
 
-            for (buf, idx) in [(stm, &stm_idx), (ntm, &ntm_idx)] {
-                for (dst, src) in buf.iter_mut().zip(idx.iter()) {
-                    *dst = *src as i32;
+                for (buf, idx) in [(stm, &stm_idx), (ntm, &ntm_idx)] {
+                    for (dst, src) in buf.iter_mut().zip(idx.iter()) {
+                        *dst = *src as i32;
+                    }
                 }
-            }
 
-            let bucket = output_bucket(pos.piece_count());
-            buckets[0] = bucket as i32;
-            skip30[0] = (bucket * L2 + 30) as i32;
-            skip31[0] = (bucket * L2 + 31) as i32;
+                let bucket = output_bucket(pos.piece_count());
+                buckets[0] = bucket as i32;
+                skip30[0] = (bucket * L2 + 30) as i32;
+                skip31[0] = (bucket * L2 + 31) as i32;
 
-            us[0] = 1.0;
-            score[0] = f32::from(pos.score);
-            outcome[0] = pos.result;
-            lambda_buf[0] = lambda;
-        },
-    );
+                us[0] = 1.0;
+                score[0] = f32::from(pos.score);
+                outcome[0] = pos.result;
+                lambda_buf[0] = lambda;
+            },
+        );
 
     let buffer_mb = 512;
     let reader = BinpackReader::new(&cfg.data, buffer_mb, threads as usize, |_| true);
@@ -78,12 +88,21 @@ fn make_loader(cfg: &TrainConfig, threads: u8, lambda: f32) -> ReadMapLoader<Bin
 }
 
 fn ensure_nnz(stm_len: usize, ntm_len: usize) {
-    assert!(stm_len <= MAX_ACTIVE_COMBINED, "stm features {stm_len} > nnz {MAX_ACTIVE_COMBINED}");
-    assert!(ntm_len <= MAX_ACTIVE_COMBINED, "ntm features {ntm_len} > nnz {MAX_ACTIVE_COMBINED}");
+    assert!(
+        stm_len <= MAX_ACTIVE_COMBINED,
+        "stm features {stm_len} > nnz {MAX_ACTIVE_COMBINED}"
+    );
+    assert!(
+        ntm_len <= MAX_ACTIVE_COMBINED,
+        "ntm features {ntm_len} > nnz {MAX_ACTIVE_COMBINED}"
+    );
 }
 
 pub fn run_train(cfg: TrainConfig) -> Result<()> {
-    ensure!(cfg.lambda >= 0.0 && cfg.lambda <= 1.0, "lambda must be in [0, 1]");
+    ensure!(
+        cfg.lambda >= 0.0 && cfg.lambda <= 1.0,
+        "lambda must be in [0, 1]"
+    );
     ensure!(cfg.start_superbatch >= 1, "start-superbatch must be >= 1");
     ensure!(cfg.superbatches >= 1, "superbatches must be >= 1");
     ensure!(cfg.save_rate >= 1, "save-rate must be >= 1");
@@ -97,10 +116,14 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
         batches_per_superbatch = 8;
         superbatches = superbatches.min(2);
         threads = threads.min(2);
-        println!(">>> SMOKE: {superbatches} superbatches x {batches_per_superbatch} batches x {batch_size}");
+        println!(
+            ">>> SMOKE: {superbatches} superbatches x {batches_per_superbatch} batches x {batch_size}"
+        );
     }
     if threads == 0 {
-        threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(16) as u8;
+        threads = std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .min(16) as u8;
     }
 
     let end_superbatch = cfg.start_superbatch + superbatches - 1;
@@ -108,7 +131,11 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
     let model = build_model();
     let definition = model.definition;
 
-    let seed = if cfg.load_checkpoint.is_some() { 1 } else { 0x5EED_C0DE };
+    let seed = if cfg.load_checkpoint.is_some() {
+        1
+    } else {
+        0x5EED_C0DE
+    };
     let weights = init_weights(&definition, seed);
 
     let device = bullet_gpu::runtime::Device::<Gpu>::new(0)
@@ -154,31 +181,40 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
     let out_dir = cfg.out_dir.clone();
     let save_rate = cfg.save_rate;
 
-    train(&mut optimiser, schedule, dataloader, |_, _, _| {}, |optimiser, step| {
-        let superbatch = step.superbatch();
-        if superbatch % save_rate == 0 || superbatch == step.final_superbatch() {
-            let path = format!("{out_dir}/ember-bullet-{superbatch}");
-            std::fs::create_dir(&path).ok();
+    train(
+        &mut optimiser,
+        schedule,
+        dataloader,
+        |_, _, _| {},
+        |optimiser, step| {
+            let superbatch = step.superbatch();
+            if superbatch % save_rate == 0 || superbatch == step.final_superbatch() {
+                let path = format!("{out_dir}/ember-bullet-{superbatch}");
+                std::fs::create_dir(&path).ok();
 
-            let optimiser_path = format!("{path}/optimiser_state");
-            std::fs::create_dir(&optimiser_path).ok();
-            optimiser
-                .write_to_checkpoint(&optimiser_path)
-                .map_err(|e| anyhow::anyhow!("writing checkpoint: {e:?}"))
-                .unwrap();
+                let optimiser_path = format!("{path}/optimiser_state");
+                std::fs::create_dir(&optimiser_path).ok();
+                optimiser
+                    .write_to_checkpoint(&optimiser_path)
+                    .map_err(|e| anyhow::anyhow!("writing checkpoint: {e:?}"))
+                    .unwrap();
 
-            let guard = optimiser.cpu_weights().unwrap();
-            let buf = guard
-                .to_quantised_buffer(&saved_formats(), true)
-                .map_err(|e| anyhow::anyhow!("quantising weights: {e}"))
-                .unwrap();
-            std::fs::write(format!("{path}/quantised.bin"), &buf).unwrap();
+                let guard = optimiser.cpu_weights().unwrap();
+                let buf = guard
+                    .to_quantised_buffer(&saved_formats(), true)
+                    .map_err(|e| anyhow::anyhow!("quantising weights: {e}"))
+                    .unwrap();
+                std::fs::write(format!("{path}/quantised.bin"), &buf).unwrap();
 
-            println!("Saved checkpoint [{path}]");
-        }
-    })
+                println!("Saved checkpoint [{path}]");
+            }
+        },
+    )
     .map_err(|e| anyhow::anyhow!("training failed: {e:?}"))?;
 
-    println!("Training done (superbatches {}..{}).", cfg.start_superbatch, end_superbatch);
+    println!(
+        "Training done (superbatches {}..{}).",
+        cfg.start_superbatch, end_superbatch
+    );
     Ok(())
 }

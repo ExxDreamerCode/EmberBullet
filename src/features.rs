@@ -480,6 +480,12 @@ pub struct EmberCombinedFeatures {
     halfka: EmberHalfKAv2Hm,
 }
 
+impl Default for EmberCombinedFeatures {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub const COMBINED_DIMS: usize = THREAT_DIMS + PSQ_DIMS;
 
 impl EmberCombinedFeatures {
