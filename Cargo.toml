@@ -10,14 +10,16 @@ repository = "https://github.com/jw1912/bullet"
 bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet_lib" }
 bullet-compiler = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet-compiler" }
 bullet-trainer = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet-trainer", default-features = false }
+bullet-gpu = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet-gpu", default-features = false }
 bulletformat = "1.8.0"
 sfbinpack = "0.6.4"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 
 [features]
-cuda = ["bullet-trainer/cuda"]
-rocm = ["bullet-trainer/rocm"]
+cuda = ["bullet-trainer/cuda", "bullet-gpu/cuda"]
+rocm = ["bullet-trainer/rocm", "bullet-gpu/rocm"]
+mock-train = []
 
 [profile.release]
 opt-level = 3

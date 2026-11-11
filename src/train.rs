@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::{Context, Result, ensure};
-use bullet_trainer::model::ModelWeights;
+use bullet_trainer::model::{ModelInputs, ModelInputsMapper};
 use bullet_trainer::optimiser::{Optimiser, ranger::Ranger};
 use bullet_trainer::reader::{DataReader, ReadMapLoader};
 use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
@@ -15,6 +13,8 @@ use crate::position::{BinpackReader, EmberPosition};
 type Gpu = bullet_gpu::runtime::cuda::Cuda;
 #[cfg(all(feature = "rocm", not(feature = "cuda")))]
 type Gpu = bullet_gpu::runtime::rocm::ROCm;
+#[cfg(all(not(feature = "cuda"), not(feature = "rocm"), feature = "mock-train"))]
+type Gpu = bullet_gpu::runtime::mock::MockGpu;
 
 fn output_bucket(piece_count: u32) -> usize {
     let b = (piece_count as i32 - 2) / 4;
@@ -28,7 +28,7 @@ impl DataReader<EmberPosition> for BinpackReader {
 }
 
 fn make_loader(cfg: &TrainConfig, threads: u8, lambda: f32) -> ReadMapLoader<BinpackReader, EmberPosition> {
-    let inputs = bullet_trainer::ModelInputs::default()
+    let inputs = ModelInputs::default()
         .add_sparse("ft_stm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
         .add_sparse("ft_ntm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
         .add_sparse("buckets", (NUM_BUCKETS, 1), 1)
@@ -41,11 +41,11 @@ fn make_loader(cfg: &TrainConfig, threads: u8, lambda: f32) -> ReadMapLoader<Bin
 
     let features = EmberCombinedFeatures::new();
 
-    let mapper = bullet_trainer::ModelInputsMapper::build(
+    let mapper = ModelInputsMapper::build(
         &inputs,
         move |pos: &EmberPosition,
               _step: Step,
-              (((((((((stm, ntm), buckets), skip30), skip31), us), score), outcome), lambda_buf)| {
+              ((((((((stm, ntm), buckets), skip30), skip31), us), score), outcome), lambda_buf)| {
             stm.fill(-1);
             ntm.fill(-1);
 

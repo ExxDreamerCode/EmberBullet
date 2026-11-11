@@ -88,6 +88,7 @@ pub fn entry_to_position(entry: &TrainingDataEntry) -> EmberPosition {
 
 pub type PositionFilter = Arc<dyn Fn(&TrainingDataEntry) -> bool + Send + Sync>;
 
+#[derive(Clone)]
 pub struct BinpackReader {
     file_paths: Vec<String>,
     buffer_size: usize,
