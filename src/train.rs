@@ -112,16 +112,16 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
     let weights = init_weights(&definition, seed);
 
     let device = bullet_gpu::runtime::Device::<Gpu>::new(0)
-        .map_err(|e| anyhow::anyhow!("device init: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("device init: {e:?}"))?;
 
     let mut optimiser: Optimiser<Gpu, Ranger<Gpu>> =
         Optimiser::new(definition, weights, device, Default::default())
-            .map_err(|e| anyhow::anyhow!("optimiser init: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("optimiser init: {e:?}"))?;
 
     if let Some(path) = &cfg.load_checkpoint {
         optimiser
             .load_from_checkpoint(path)
-            .map_err(|e| anyhow::anyhow!("loading checkpoint from {path}: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("loading checkpoint from {path}: {e:?}"))?;
         println!("Resumed optimiser state from {path}");
     }
 
@@ -164,7 +164,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
             std::fs::create_dir(&optimiser_path).ok();
             optimiser
                 .write_to_checkpoint(&optimiser_path)
-                .map_err(|e| anyhow::anyhow!("writing checkpoint: {e}"))
+                .map_err(|e| anyhow::anyhow!("writing checkpoint: {e:?}"))
                 .unwrap();
 
             let guard = optimiser.cpu_weights().unwrap();
