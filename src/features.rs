@@ -475,6 +475,39 @@ impl SparseInputType for EmberHalfKAv2Hm {
     }
 }
 
+pub struct EmberCombinedFeatures {
+    threats: EmberFullThreats,
+    halfka: EmberHalfKAv2Hm,
+}
+
+pub const COMBINED_DIMS: usize = THREAT_DIMS + PSQ_DIMS;
+
+impl EmberCombinedFeatures {
+    pub fn new() -> Self {
+        Self {
+            threats: EmberFullThreats::new(),
+            halfka: EmberHalfKAv2Hm::new(),
+        }
+    }
+
+    pub fn collect(&self, pos: &EmberPosition, stm: &mut Vec<usize>, ntm: &mut Vec<usize>) {
+        stm.clear();
+        ntm.clear();
+        self.threats.emit_threat_pairs(pos, |s, n| {
+            if s != INACTIVE {
+                stm.push(s);
+            }
+            if n != INACTIVE {
+                ntm.push(n);
+            }
+        });
+        self.halfka.map_features(pos, |s, n| {
+            stm.push(s);
+            ntm.push(n);
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -26,8 +26,20 @@ pub enum Commands {
         #[arg(long, default_value_t = 1e-3)]
         lr: f32,
 
+        #[arg(long)]
+        final_lr: Option<f32>,
+
         #[arg(long, default_value_t = 10)]
         superbatches: usize,
+
+        #[arg(long, default_value_t = 1)]
+        start_superbatch: usize,
+
+        #[arg(long, default_value_t = 6104)]
+        batches_per_superbatch: usize,
+
+        #[arg(long, default_value_t = 10)]
+        save_rate: usize,
 
         #[arg(long, default_value = "checkpoints")]
         out_dir: PathBuf,
@@ -37,6 +49,9 @@ pub enum Commands {
 
         #[arg(long, default_value_t = 1.0)]
         lambda: f32,
+
+        #[arg(long, default_value_t = 0)]
+        threads: u8,
 
         #[arg(long, action = clap::ArgAction::SetTrue)]
         smoke: bool,
@@ -62,21 +77,34 @@ pub fn run(cli: Cli) -> Result<()> {
             data,
             batch_size,
             lr,
+            final_lr,
             superbatches,
+            start_superbatch,
+            batches_per_superbatch,
+            save_rate,
             out_dir,
             load_checkpoint,
             lambda,
+            threads,
             smoke,
-        } => train_cmd(
-            data,
-            batch_size,
-            lr,
-            superbatches,
-            out_dir,
-            load_checkpoint,
-            lambda,
-            smoke,
-        ),
+        } => {
+            let cfg = TrainConfig {
+                data: data.to_string_lossy().into_owned(),
+                batch_size,
+                lr,
+                final_lr: final_lr.unwrap_or(lr * 0.3f32.powi(5)),
+                superbatches,
+                start_superbatch,
+                batches_per_superbatch,
+                save_rate,
+                out_dir: out_dir.to_string_lossy().into_owned(),
+                load_checkpoint: load_checkpoint.map(|p| p.to_string_lossy().into_owned()),
+                lambda,
+                threads,
+                smoke,
+            };
+            train_dispatch(cfg)
+        }
         Commands::Export {
             checkpoint,
             out,
@@ -86,21 +114,38 @@ pub fn run(cli: Cli) -> Result<()> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn train_cmd(
-    _data: PathBuf,
-    _batch_size: usize,
-    _lr: f32,
-    _superbatches: usize,
-    _out_dir: PathBuf,
-    _load_checkpoint: Option<PathBuf>,
-    _lambda: f32,
-    _smoke: bool,
-) -> Result<()> {
-    bail!(
-        "train requires a CUDA/ROCm build of bullet; this binary was compiled without a GPU \
-         backend. Use `export` instead, or build with `--features cuda` on a CUDA machine."
-    )
+#[derive(Clone, Debug)]
+pub struct TrainConfig {
+    pub data: String,
+    pub batch_size: usize,
+    pub lr: f32,
+    pub final_lr: f32,
+    pub superbatches: usize,
+    pub start_superbatch: usize,
+    pub batches_per_superbatch: usize,
+    pub save_rate: usize,
+    pub out_dir: String,
+    pub load_checkpoint: Option<String>,
+    pub lambda: f32,
+    pub threads: u8,
+    pub smoke: bool,
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn train_dispatch(cfg: TrainConfig) -> Result<()> {
+    #[cfg(any(feature = "cuda", feature = "rocm"))]
+    {
+        return crate::train::run_train(cfg);
+    }
+
+    #[cfg(not(any(feature = "cuda", feature = "rocm")))]
+    {
+        let _ = cfg;
+        bail!(
+            "train requires a CUDA/ROCm build of bullet; this binary was compiled without a GPU \
+             backend. Use `export` instead, or build with `--features cuda` on a CUDA machine."
+        )
+    }
 }
 
 fn export_cmd(

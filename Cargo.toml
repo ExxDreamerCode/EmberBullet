@@ -15,6 +15,10 @@ sfbinpack = "0.6.4"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 
+[features]
+cuda = ["bullet-trainer/cuda"]
+rocm = ["bullet-trainer/rocm"]
+
 [profile.release]
 opt-level = 3
 

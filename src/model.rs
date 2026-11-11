@@ -11,9 +11,9 @@ pub const FT_OUTPUTS: usize = L1 + NUM_BUCKETS;
 pub const THREAT_DIMS: usize = 60_720;
 pub const HALFKA_DIMS: usize = 22_528;
 pub const COMBINED_INPUTS: usize = THREAT_DIMS + HALFKA_DIMS;
-const MAX_ACTIVE_THREATS: usize = 256;
-const MAX_ACTIVE_HALFKA: usize = 32;
-const MAX_ACTIVE_COMBINED: usize = MAX_ACTIVE_THREATS + MAX_ACTIVE_HALFKA;
+pub const MAX_ACTIVE_THREATS: usize = 256;
+pub const MAX_ACTIVE_HALFKA: usize = 32;
+pub const MAX_ACTIVE_COMBINED: usize = MAX_ACTIVE_THREATS + MAX_ACTIVE_HALFKA;
 
 pub const CLIP_FT_WEIGHT: f32 = 127.0 / 256.0;
 pub const CLIP_L1_WEIGHT: f32 = 127.0 / 128.0;
@@ -169,12 +169,12 @@ pub fn saved_formats() -> Vec<SavedFormat> {
     vec![
         SavedFormat::id("ft_w").round().quantise::<i8>(255),
         SavedFormat::id("ft_b").round().quantise::<i16>(255),
-        SavedFormat::id("l1/w").round().quantise::<i8>(128),
-        SavedFormat::id("l1/b").round().quantise::<i32>(16384),
-        SavedFormat::id("l2/w").round().quantise::<i8>(64),
-        SavedFormat::id("l2/b").round().quantise::<i32>(8192),
-        SavedFormat::id("out/w").round().quantise::<i8>(128),
-        SavedFormat::id("out/b").round().quantise::<i32>(16384),
+        SavedFormat::id("l1w").round().quantise::<i8>(128),
+        SavedFormat::id("l1b").round().quantise::<i32>(16384),
+        SavedFormat::id("l2w").round().quantise::<i8>(64),
+        SavedFormat::id("l2b").round().quantise::<i32>(8192),
+        SavedFormat::id("outw").round().quantise::<i8>(128),
+        SavedFormat::id("outb").round().quantise::<i32>(16384),
     ]
 }
 
