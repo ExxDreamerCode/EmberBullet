@@ -220,7 +220,7 @@ impl BinpackReader {
         });
 
         'dataloading: while let Ok(shuffle_buffer) = buffer_receiver.recv() {
-            if !f(&shuffle_buffer) {
+            if f(&shuffle_buffer) {
                 buffer_msg_sender.send(true).unwrap();
                 break 'dataloading;
             }
