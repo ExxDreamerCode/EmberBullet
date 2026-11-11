@@ -195,6 +195,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bullet-compiler",
+ "bullet-gpu",
  "bullet-trainer",
  "bullet_lib",
  "bulletformat",
