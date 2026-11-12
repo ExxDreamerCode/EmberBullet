@@ -1,13 +1,19 @@
 use anyhow::{Context, Result, ensure};
 use bullet_trainer::model::{ModelInputs, ModelInputsMapper};
-use bullet_trainer::optimiser::{Optimiser, ranger::Ranger};
+use bullet_trainer::optimiser::{
+    Optimiser,
+    clip::{WeightClipping, WeightClippingParams},
+    ranger::Ranger,
+    utils::Placement,
+};
 use bullet_trainer::reader::ReadMapLoader;
 use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
 
 use crate::cli::TrainConfig;
 use crate::features::{COMBINED_DIMS, EmberCombinedFeatures};
 use crate::model::{
-    L2, MAX_ACTIVE_COMBINED, NUM_BUCKETS, build_model, init_weights, saved_formats,
+    CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, L2, MAX_ACTIVE_COMBINED,
+    NUM_BUCKETS, build_model, init_weights, saved_formats,
 };
 use crate::position::{BinpackReader, EmberPosition};
 
@@ -135,9 +141,40 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
     let device = bullet_gpu::runtime::Device::<Gpu>::new(0)
         .map_err(|e| anyhow::anyhow!("device init: {e:?}"))?;
 
-    let mut optimiser: Optimiser<Gpu, Ranger<Gpu>> =
-        Optimiser::new(definition, weights, device, Default::default())
-            .map_err(|e| anyhow::anyhow!("optimiser init: {e:?}"))?;
+    let mut optimiser: Optimiser<Gpu, WeightClipping<Gpu, Ranger<Gpu>>> = Optimiser::new(
+        definition,
+        weights,
+        device,
+        WeightClippingParams {
+            inner: Default::default(),
+            placement: Placement::After,
+            min: -1.98,
+            max: 1.98,
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("optimiser init: {e:?}"))?;
+
+    let set_clip_ranges = |optimiser: &mut Optimiser<Gpu, WeightClipping<Gpu, Ranger<Gpu>>>| {
+        for (name, (min, max)) in [
+            ("ft_w", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
+            ("ft_b", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
+            ("l1w", (-CLIP_L1_WEIGHT, CLIP_L1_WEIGHT)),
+            ("l2w", (-CLIP_L2_WEIGHT, CLIP_L2_WEIGHT)),
+            ("outw", (-CLIP_OUT_WEIGHT, CLIP_OUT_WEIGHT)),
+        ] {
+            optimiser.set_params_for_weight(
+                name,
+                WeightClippingParams {
+                    inner: Default::default(),
+                    placement: Placement::After,
+                    min,
+                    max,
+                },
+            );
+        }
+    };
+
+    set_clip_ranges(&mut optimiser);
 
     if let Some(path) = &cfg.load_checkpoint {
         optimiser
@@ -145,6 +182,8 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
             .map_err(|e| anyhow::anyhow!("loading checkpoint from {path}: {e:?}"))?;
         println!("Resumed optimiser state from {path}");
     }
+
+    set_clip_ranges(&mut optimiser);
 
     let steps = TrainingSteps {
         batch_size,
