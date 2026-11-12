@@ -75,7 +75,7 @@ fn make_loader(
                 skip30[0] = (bucket * L2 + 30) as i32;
                 skip31[0] = (bucket * L2 + 31) as i32;
 
-                us[0] = 1.0;
+                us[0] = if pos.is_white_to_move { 1.0 } else { 0.0 };
                 score[0] = f32::from(pos.score);
                 outcome[0] = pos.result;
                 lambda_buf[0] = lambda;
