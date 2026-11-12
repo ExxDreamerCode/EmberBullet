@@ -1,14 +1,17 @@
 use std::fs;
 
 use ember_bullet_v2_trainer::export::{
-    ExportedStack, ExportedWeights, HIDDEN_SIZE, NUM_STACKS, PSQ_DIMS, PSQT_BUCKETS,
+    ExportedStack, ExportedWeights, HIDDEN_SIZE, NUM_STACKS, PSQT_BUCKETS, parse_container,
     write_container,
 };
 use ember_bullet_v2_trainer::model::{
-    COMBINED_INPUTS, FT_OUTPUTS, L1, L2, L3, NUM_BUCKETS, THREAT_DIMS,
+    FT_OUTPUTS, HALFKA_DIMS, L1, L2, L3, NUM_BUCKETS, THREAT_DIMS,
 };
 
-const SOURCE_FT_W_MULT: f32 = 256.0;
+const SOURCE_FT_WT_MULT: f32 = 256.0;
+const SOURCE_FT_WT_PSQT_MULT: f32 = 9600.0;
+const SOURCE_FT_WH_MULT: f32 = 256.0;
+const SOURCE_FT_WH_PSQT_MULT: f32 = 9600.0;
 const SOURCE_FT_B_MULT: f32 = 256.0;
 const SOURCE_L1W_MULT: f32 = 128.0;
 const SOURCE_L1B_MULT: f32 = 16384.0;
@@ -16,6 +19,12 @@ const SOURCE_L2W_MULT: f32 = 64.0;
 const SOURCE_L2B_MULT: f32 = 8192.0;
 const SOURCE_OUTW_MULT: f32 = 128.0;
 const SOURCE_OUTB_MULT: f32 = 16384.0;
+
+fn read_i8(data: &[u8], pos: &mut usize) -> i32 {
+    let val = data[*pos] as i8 as i32;
+    *pos += 1;
+    val
+}
 
 fn read_i16_le(data: &[u8], pos: &mut usize) -> i16 {
     let val = i16::from_le_bytes([data[*pos], data[*pos + 1]]);
@@ -43,10 +52,28 @@ fn main() {
     });
     let mut pos = 0;
 
-    let ft_w_len = FT_OUTPUTS * COMBINED_INPUTS;
-    let mut ft_w = vec![0.0f32; ft_w_len];
-    for val in ft_w.iter_mut() {
-        *val = read_i16_le(&data, &mut pos) as f32 / SOURCE_FT_W_MULT;
+    let ft_wt_len = FT_OUTPUTS * THREAT_DIMS;
+    let mut ft_wt = vec![0.0f32; ft_wt_len];
+    for val in ft_wt.iter_mut() {
+        *val = read_i8(&data, &mut pos) as f32 / SOURCE_FT_WT_MULT;
+    }
+
+    let ft_wt_psqt_len = PSQT_BUCKETS * THREAT_DIMS;
+    let mut ft_wt_psqt = vec![0.0f32; ft_wt_psqt_len];
+    for val in ft_wt_psqt.iter_mut() {
+        *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_FT_WT_PSQT_MULT;
+    }
+
+    let ft_wh_len = FT_OUTPUTS * HALFKA_DIMS;
+    let mut ft_wh = vec![0.0f32; ft_wh_len];
+    for val in ft_wh.iter_mut() {
+        *val = read_i16_le(&data, &mut pos) as f32 / SOURCE_FT_WH_MULT;
+    }
+
+    let ft_wh_psqt_len = PSQT_BUCKETS * HALFKA_DIMS;
+    let mut ft_wh_psqt = vec![0.0f32; ft_wh_psqt_len];
+    for val in ft_wh_psqt.iter_mut() {
+        *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_FT_WH_PSQT_MULT;
     }
 
     let ft_b_len = FT_OUTPUTS;
@@ -58,8 +85,7 @@ fn main() {
     let l1w_len = NUM_BUCKETS * L2 * L1;
     let mut l1w = vec![0.0f32; l1w_len];
     for val in l1w.iter_mut() {
-        *val = data[pos] as i8 as f32 / SOURCE_L1W_MULT;
-        pos += 1;
+        *val = read_i8(&data, &mut pos) as f32 / SOURCE_L1W_MULT;
     }
 
     let l1b_len = NUM_BUCKETS * L2;
@@ -71,8 +97,7 @@ fn main() {
     let l2w_len = NUM_BUCKETS * L2 * (L2 * 2);
     let mut l2w = vec![0.0f32; l2w_len];
     for val in l2w.iter_mut() {
-        *val = data[pos] as i8 as f32 / SOURCE_L2W_MULT;
-        pos += 1;
+        *val = read_i8(&data, &mut pos) as f32 / SOURCE_L2W_MULT;
     }
 
     let l2b_len = NUM_BUCKETS * L2;
@@ -84,8 +109,7 @@ fn main() {
     let outw_len = NUM_BUCKETS * L3 * (L2 * 2 + L2 * 2);
     let mut outw = vec![0.0f32; outw_len];
     for val in outw.iter_mut() {
-        *val = data[pos] as i8 as f32 / SOURCE_OUTW_MULT;
-        pos += 1;
+        *val = read_i8(&data, &mut pos) as f32 / SOURCE_OUTW_MULT;
     }
 
     let outb_len = NUM_BUCKETS * L3;
@@ -94,28 +118,25 @@ fn main() {
         *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_OUTB_MULT;
     }
 
-    let cols = COMBINED_INPUTS;
     let mut threat_weights = Vec::with_capacity(THREAT_DIMS * HIDDEN_SIZE);
     let mut threat_psqt = Vec::with_capacity(THREAT_DIMS * PSQT_BUCKETS);
-    let mut psq_weights = Vec::with_capacity(PSQ_DIMS * HIDDEN_SIZE);
-    let mut psqt = Vec::with_capacity(PSQ_DIMS * PSQT_BUCKETS);
+    let mut psq_weights = Vec::with_capacity(HALFKA_DIMS * HIDDEN_SIZE);
+    let mut psqt = Vec::with_capacity(HALFKA_DIMS * PSQT_BUCKETS);
 
-    for feature in 0..COMBINED_INPUTS {
+    for feature in 0..THREAT_DIMS {
         for out in 0..HIDDEN_SIZE {
-            let value = ft_w[out * cols + feature];
-            if feature < THREAT_DIMS {
-                threat_weights.push(value);
-            } else {
-                psq_weights.push(value);
-            }
+            threat_weights.push(ft_wt[out * THREAT_DIMS + feature]);
         }
         for bucket in 0..PSQT_BUCKETS {
-            let value = ft_w[(HIDDEN_SIZE + bucket) * cols + feature];
-            if feature < THREAT_DIMS {
-                threat_psqt.push(value);
-            } else {
-                psqt.push(value);
-            }
+            threat_psqt.push(ft_wt_psqt[feature * PSQT_BUCKETS + bucket]);
+        }
+    }
+    for feature in 0..HALFKA_DIMS {
+        for out in 0..HIDDEN_SIZE {
+            psq_weights.push(ft_wh[out * HALFKA_DIMS + feature]);
+        }
+        for bucket in 0..PSQT_BUCKETS {
+            psqt.push(ft_wh_psqt[feature * PSQT_BUCKETS + bucket]);
         }
     }
 
@@ -158,11 +179,18 @@ fn main() {
     };
 
     let mut buf = Vec::new();
-    write_container(&mut buf, &weights, "Ember V2 net training with bullet")
+    write_container(&mut buf, &weights, "Ember V2 net trained with bullet")
         .expect("Failed to write container");
+
+    let parsed = parse_container(&buf).expect("Failed to re-parse container");
+    println!(
+        "Wrote {} bytes to {output_path} (arch {:#x}, stacks {})",
+        buf.len(),
+        parsed.arch_hash,
+        parsed.num_stacks
+    );
     fs::write(&output_path, &buf).unwrap_or_else(|e| {
         eprintln!("Failed to write {output_path}: {e}");
         std::process::exit(1);
     });
-    println!("Wrote {} bytes to {output_path}", buf.len());
 }

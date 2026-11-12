@@ -290,16 +290,31 @@ fn ft_forward<'a>(
 
 pub fn saved_formats() -> Vec<SavedFormat> {
     vec![
-        SavedFormat::id("ft_wt").round().quantise::<i8>(256),
+        SavedFormat::id("ft_wt")
+            .transpose()
+            .round()
+            .quantise::<i8>(256),
         SavedFormat::id("ft_wt_psqt").round().quantise::<i32>(9600),
-        SavedFormat::id("ft_wh").round().quantise::<i16>(256),
+        SavedFormat::id("ft_wh")
+            .transpose()
+            .round()
+            .quantise::<i16>(256),
         SavedFormat::id("ft_wh_psqt").round().quantise::<i32>(9600),
         SavedFormat::id("ft_b").round().quantise::<i16>(256),
-        SavedFormat::id("l1w").round().quantise::<i8>(128),
+        SavedFormat::id("l1w")
+            .transpose()
+            .round()
+            .quantise::<i8>(128),
         SavedFormat::id("l1b").round().quantise::<i32>(16384),
-        SavedFormat::id("l2w").round().quantise::<i8>(64),
+        SavedFormat::id("l2w")
+            .transpose()
+            .round()
+            .quantise::<i8>(64),
         SavedFormat::id("l2b").round().quantise::<i32>(8192),
-        SavedFormat::id("outw").round().quantise::<i8>(128),
+        SavedFormat::id("outw")
+            .transpose()
+            .round()
+            .quantise::<i8>(128),
         SavedFormat::id("outb").round().quantise::<i32>(16384),
     ]
 }

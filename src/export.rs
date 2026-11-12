@@ -137,18 +137,18 @@ pub fn read_model_weights(
 
     for feature in 0..THREAT_DIMS {
         for out in 0..HIDDEN_SIZE {
-            threat_weights.push(ft_wt[out * THREAT_DIMS + feature]);
+            threat_weights.push(ft_wt[feature * FT_OUTPUTS + out]);
         }
         for bucket in 0..PSQT_BUCKETS {
-            threat_psqt.push(ft_wt_psqt[bucket * THREAT_DIMS + feature]);
+            threat_psqt.push(ft_wt_psqt[feature * PSQT_BUCKETS + bucket]);
         }
     }
     for feature in 0..PSQ_DIMS {
         for out in 0..HIDDEN_SIZE {
-            psq_weights.push(ft_wh[out * PSQ_DIMS + feature]);
+            psq_weights.push(ft_wh[feature * FT_OUTPUTS + out]);
         }
         for bucket in 0..PSQT_BUCKETS {
-            psqt.push(ft_wh_psqt[bucket * PSQ_DIMS + feature]);
+            psqt.push(ft_wh_psqt[feature * PSQT_BUCKETS + bucket]);
         }
     }
 
@@ -164,11 +164,11 @@ pub fn read_model_weights(
         for h in 0..L2 {
             fc0_bias.push(l1_b[base + h]);
             for col in 0..HIDDEN_SIZE {
-                fc0_weights.push(l1_w[base * HIDDEN_SIZE + h * HIDDEN_SIZE + col]);
+                fc0_weights.push(l1_w[col * (NUM_BUCKETS * L2) + base + h]);
             }
             fc1_bias.push(l2_b[base + h]);
             for col in 0..(L2 * 2) {
-                fc1_weights.push(l2_w[base * (L2 * 2) + h * (L2 * 2) + col]);
+                fc1_weights.push(l2_w[col * (NUM_BUCKETS * L2) + base + h]);
             }
         }
         stacks.push(ExportedStack {
@@ -177,7 +177,9 @@ pub fn read_model_weights(
             fc1_bias,
             fc1_weights,
             fc2_bias: out_b[b],
-            fc2_weights: out_w[b * (L2 * 2 + L2 * 2)..(b + 1) * (L2 * 2 + L2 * 2)].to_vec(),
+            fc2_weights: (0..(L2 * 2 + L2 * 2))
+                .map(|col| out_w[col * NUM_BUCKETS + b])
+                .collect(),
         });
     }
 

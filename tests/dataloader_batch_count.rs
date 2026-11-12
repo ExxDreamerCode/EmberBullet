@@ -88,7 +88,7 @@ fn make_mapper(lambda: f32) -> bullet_trainer::model::ModelInputsMapper<EmberPos
                 }
             }
 
-            let bucket = ((pos.piece_count() as i32 - 2) / 4).clamp(0, 7) as usize;
+            let bucket = ((pos.piece_count() as i32 - 1) / 4).clamp(0, 7) as usize;
             buckets[0] = bucket as i32;
             skip30[0] = (bucket * L2 + 30) as i32;
             skip31[0] = (bucket * L2 + 31) as i32;

@@ -26,7 +26,7 @@ type Gpu = bullet_gpu::runtime::rocm::ROCm;
 type Gpu = bullet_gpu::runtime::mock::MockGpu;
 
 fn output_bucket(piece_count: u32) -> usize {
-    let b = (piece_count as i32 - 2) / 4;
+    let b = (piece_count as i32 - 1) / 4;
     b.clamp(0, 7) as usize
 }
 
