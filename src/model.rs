@@ -171,7 +171,7 @@ pub fn saved_formats() -> Vec<SavedFormat> {
         SavedFormat::id("ft_b").round().quantise::<i16>(255),
         SavedFormat::id("l1w").round().quantise::<i8>(127),
         SavedFormat::id("l1b").round().quantise::<i32>(16384),
-        SavedFormat::id("l2w").round().quantise::<i8>(64),
+        SavedFormat::id("l2w").round().quantise::<i8>(63),
         SavedFormat::id("l2b").round().quantise::<i32>(8192),
         SavedFormat::id("outw").round().quantise::<i8>(127),
         SavedFormat::id("outb").round().quantise::<i32>(16384),
