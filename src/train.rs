@@ -12,8 +12,8 @@ use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
 use crate::cli::TrainConfig;
 use crate::features::{COMBINED_DIMS, EmberCombinedFeatures};
 use crate::model::{
-    CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, L2, MAX_ACTIVE_COMBINED,
-    NUM_BUCKETS, build_model, init_weights, saved_formats,
+    CLIP_FT_BIAS, CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, L2,
+    MAX_ACTIVE_COMBINED, NUM_BUCKETS, build_model, init_weights, saved_formats,
 };
 use crate::position::{BinpackReader, EmberPosition};
 
@@ -157,7 +157,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
     let set_clip_ranges = |optimiser: &mut Optimiser<Gpu, WeightClipping<Gpu, Ranger<Gpu>>>| {
         for (name, (min, max)) in [
             ("ft_w", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
-            ("ft_b", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
+            ("ft_b", (-CLIP_FT_BIAS, CLIP_FT_BIAS)),
             ("l1w", (-CLIP_L1_WEIGHT, CLIP_L1_WEIGHT)),
             ("l2w", (-CLIP_L2_WEIGHT, CLIP_L2_WEIGHT)),
             ("outw", (-CLIP_OUT_WEIGHT, CLIP_OUT_WEIGHT)),

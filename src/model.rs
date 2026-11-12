@@ -16,6 +16,7 @@ pub const MAX_ACTIVE_HALFKA: usize = 32;
 pub const MAX_ACTIVE_COMBINED: usize = MAX_ACTIVE_THREATS + MAX_ACTIVE_HALFKA;
 
 pub const CLIP_FT_WEIGHT: f32 = 127.0 / 256.0;
+pub const CLIP_FT_BIAS: f32 = 32767.0 / 256.0;
 pub const CLIP_L1_WEIGHT: f32 = 127.0 / 128.0;
 pub const CLIP_L2_WEIGHT: f32 = 127.0 / 64.0;
 pub const CLIP_OUT_WEIGHT: f32 = 127.0 / 128.0;
