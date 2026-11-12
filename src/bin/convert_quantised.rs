@@ -1,5 +1,3 @@
-#![allow(clippy::needless_range_loop)]
-
 use std::fs;
 
 use ember_bullet_v2_trainer::export::{
@@ -47,53 +45,53 @@ fn main() {
 
     let ft_w_len = FT_OUTPUTS * COMBINED_INPUTS;
     let mut ft_w = vec![0.0f32; ft_w_len];
-    for i in 0..ft_w_len {
-        ft_w[i] = read_i16_le(&data, &mut pos) as f32 / SOURCE_FT_W_MULT;
+    for val in ft_w.iter_mut() {
+        *val = read_i16_le(&data, &mut pos) as f32 / SOURCE_FT_W_MULT;
     }
 
     let ft_b_len = FT_OUTPUTS;
     let mut ft_b = vec![0.0f32; ft_b_len];
-    for i in 0..ft_b_len {
-        ft_b[i] = read_i16_le(&data, &mut pos) as f32 / SOURCE_FT_B_MULT;
+    for val in ft_b.iter_mut() {
+        *val = read_i16_le(&data, &mut pos) as f32 / SOURCE_FT_B_MULT;
     }
 
     let l1w_len = NUM_BUCKETS * L2 * L1;
     let mut l1w = vec![0.0f32; l1w_len];
-    for i in 0..l1w_len {
-        l1w[i] = data[pos] as i8 as f32 / SOURCE_L1W_MULT;
+    for val in l1w.iter_mut() {
+        *val = data[pos] as i8 as f32 / SOURCE_L1W_MULT;
         pos += 1;
     }
 
     let l1b_len = NUM_BUCKETS * L2;
     let mut l1b = vec![0.0f32; l1b_len];
-    for i in 0..l1b_len {
-        l1b[i] = read_i32_le(&data, &mut pos) as f32 / SOURCE_L1B_MULT;
+    for val in l1b.iter_mut() {
+        *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_L1B_MULT;
     }
 
     let l2w_len = NUM_BUCKETS * L2 * (L2 * 2);
     let mut l2w = vec![0.0f32; l2w_len];
-    for i in 0..l2w_len {
-        l2w[i] = data[pos] as i8 as f32 / SOURCE_L2W_MULT;
+    for val in l2w.iter_mut() {
+        *val = data[pos] as i8 as f32 / SOURCE_L2W_MULT;
         pos += 1;
     }
 
     let l2b_len = NUM_BUCKETS * L2;
     let mut l2b = vec![0.0f32; l2b_len];
-    for i in 0..l2b_len {
-        l2b[i] = read_i32_le(&data, &mut pos) as f32 / SOURCE_L2B_MULT;
+    for val in l2b.iter_mut() {
+        *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_L2B_MULT;
     }
 
     let outw_len = NUM_BUCKETS * L3 * (L2 * 2 + L2 * 2);
     let mut outw = vec![0.0f32; outw_len];
-    for i in 0..outw_len {
-        outw[i] = data[pos] as i8 as f32 / SOURCE_OUTW_MULT;
+    for val in outw.iter_mut() {
+        *val = data[pos] as i8 as f32 / SOURCE_OUTW_MULT;
         pos += 1;
     }
 
     let outb_len = NUM_BUCKETS * L3;
     let mut outb = vec![0.0f32; outb_len];
-    for i in 0..outb_len {
-        outb[i] = read_i32_le(&data, &mut pos) as f32 / SOURCE_OUTB_MULT;
+    for val in outb.iter_mut() {
+        *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_OUTB_MULT;
     }
 
     let cols = COMBINED_INPUTS;
@@ -160,7 +158,7 @@ fn main() {
     };
 
     let mut buf = Vec::new();
-    write_container(&mut buf, &weights, "Converted from quantised.bin")
+    write_container(&mut buf, &weights, "Ember V2 net training with bullet")
         .expect("Failed to write container");
     fs::write(&output_path, &buf).unwrap_or_else(|e| {
         eprintln!("Failed to write {output_path}: {e}");
