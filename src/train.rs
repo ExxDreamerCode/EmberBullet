@@ -194,11 +194,17 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
                     .unwrap();
 
                 let guard = optimiser.cpu_weights().unwrap();
-                let buf = guard
-                    .to_quantised_buffer(&saved_formats(), true)
-                    .map_err(|e| anyhow::anyhow!("quantising weights: {e}"))
-                    .unwrap();
-                std::fs::write(format!("{path}/quantised.bin"), &buf).unwrap();
+                match guard.to_quantised_buffer(&saved_formats(), true) {
+                    Ok(buf) => std::fs::write(format!("{path}/quantised.bin"), &buf).unwrap(),
+                    Err(e) => {
+                        eprintln!(
+                            "WARNING: quantising weights failed ({e}); saving raw f32 weights to \
+                             {path}/raw.bin and continuing training"
+                        );
+                        let mut file = std::fs::File::create(format!("{path}/raw.bin")).unwrap();
+                        guard.write_into(&mut file).unwrap();
+                    }
+                }
 
                 println!("Saved checkpoint [{path}]");
             }
