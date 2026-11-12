@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, ensure};
 use bullet_trainer::model::{ModelInputs, ModelInputsMapper};
 use bullet_trainer::optimiser::{Optimiser, ranger::Ranger};
-use bullet_trainer::reader::{DataReader, ReadMapLoader};
+use bullet_trainer::reader::ReadMapLoader;
 use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
 
 use crate::cli::TrainConfig;
@@ -21,12 +21,6 @@ type Gpu = bullet_gpu::runtime::mock::MockGpu;
 fn output_bucket(piece_count: u32) -> usize {
     let b = (piece_count as i32 - 2) / 4;
     b.clamp(0, 7) as usize
-}
-
-impl DataReader<EmberPosition> for BinpackReader {
-    fn read_chunks<F: FnMut(&[EmberPosition]) -> bool>(&self, skip_count: usize, f: F) {
-        BinpackReader::read_chunks(self, skip_count, f)
-    }
 }
 
 fn make_loader(

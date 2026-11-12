@@ -1,3 +1,4 @@
+use bullet_trainer::reader::DataReader;
 use sfbinpack::{
     ChunkReader, TrainingDataEntry,
     chess::{color::Color, coords::Square, piecetype::PieceType},
@@ -120,8 +121,10 @@ impl BinpackReader {
             filter: Arc::new(filter),
         }
     }
+}
 
-    pub fn read_chunks<F: FnMut(&[EmberPosition]) -> bool>(&self, _skip_count: usize, mut f: F) {
+impl DataReader<EmberPosition> for BinpackReader {
+    fn read_chunks<F: FnMut(&[EmberPosition]) -> bool>(&self, _skip_count: usize, mut f: F) {
         use sfbinpack::read_chunk_into;
         use std::io::BufReader;
         use std::sync::mpsc;
