@@ -131,9 +131,7 @@ pub fn build_model() -> EmberModel {
     let qf = ((cp - 270.0) / 340.0).sigmoid();
     let pf = ((score - 270.0) / 380.0).sigmoid();
     let pt = lambda * pf + (1.0 - lambda) * outcome;
-    let loss = (pt - qf).abs_pow(2.5);
-
-    let loss = loss.reduce_sum_batch();
+    let loss = (pt - qf).abs_pow(2.5).reduce_sum_batch();
 
     let definition = ModelDefinition::new(
         builder.ir().clone(),
