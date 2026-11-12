@@ -30,39 +30,59 @@ fn write_synthetic_binpack(path: &str, entries: usize) {
 
 fn make_mapper(lambda: f32) -> bullet_trainer::model::ModelInputsMapper<EmberPosition> {
     use ember_bullet_v2_trainer::features::EmberCombinedFeatures;
-    use ember_bullet_v2_trainer::model::{L2, MAX_ACTIVE_COMBINED};
+    use ember_bullet_v2_trainer::model::{
+        HALFKA_DIMS, L2, MAX_ACTIVE_HALFKA, MAX_ACTIVE_THREATS, NUM_BUCKETS, THREAT_DIMS,
+    };
 
     let features = EmberCombinedFeatures::new();
 
-    let inputs = {
-        use ember_bullet_v2_trainer::features::COMBINED_DIMS;
-        use ember_bullet_v2_trainer::model::{L2, MAX_ACTIVE_COMBINED, NUM_BUCKETS};
-
-        bullet_trainer::model::ModelInputs::default()
-            .add_sparse("ft_stm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
-            .add_sparse("ft_ntm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
-            .add_sparse("buckets", (NUM_BUCKETS, 1), 1)
-            .add_sparse("skip_idx_30", (L2 * NUM_BUCKETS, 1), 1)
-            .add_sparse("skip_idx_31", (L2 * NUM_BUCKETS, 1), 1)
-            .add_dense("us", (1, 1))
-            .add_dense("score", (1, 1))
-            .add_dense("outcome", (1, 1))
-            .add_dense("lambda", (1, 1))
-    };
+    let inputs = bullet_trainer::model::ModelInputs::default()
+        .add_sparse("ft_t_stm", (THREAT_DIMS, 1), MAX_ACTIVE_THREATS)
+        .add_sparse("ft_t_ntm", (THREAT_DIMS, 1), MAX_ACTIVE_THREATS)
+        .add_sparse("ft_h_stm", (HALFKA_DIMS, 1), MAX_ACTIVE_HALFKA)
+        .add_sparse("ft_h_ntm", (HALFKA_DIMS, 1), MAX_ACTIVE_HALFKA)
+        .add_sparse("buckets", (NUM_BUCKETS, 1), 1)
+        .add_sparse("skip_idx_30", (L2 * NUM_BUCKETS, 1), 1)
+        .add_sparse("skip_idx_31", (L2 * NUM_BUCKETS, 1), 1)
+        .add_dense("us", (1, 1))
+        .add_dense("score", (1, 1))
+        .add_dense("outcome", (1, 1))
+        .add_dense("lambda", (1, 1));
 
     bullet_trainer::model::ModelInputsMapper::build(
         &inputs,
         move |pos: &EmberPosition,
               _step: bullet_trainer::run::Step,
-              ((((((((stm, ntm), buckets), skip30), skip31), us), score), outcome), lambda_buf)| {
-            stm.fill(-1);
-            ntm.fill(-1);
+              (
+            (
+                ((((((((t_stm, t_ntm), h_stm), h_ntm), buckets), skip30), skip31), us), score),
+                outcome,
+            ),
+            lambda_buf,
+        )| {
+            t_stm.fill(-1);
+            t_ntm.fill(-1);
+            h_stm.fill(-1);
+            h_ntm.fill(-1);
 
-            let mut stm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
-            let mut ntm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
-            features.collect(pos, &mut stm_idx, &mut ntm_idx);
+            let mut t_stm_idx = Vec::with_capacity(MAX_ACTIVE_THREATS);
+            let mut t_ntm_idx = Vec::with_capacity(MAX_ACTIVE_THREATS);
+            let mut h_stm_idx = Vec::with_capacity(MAX_ACTIVE_HALFKA);
+            let mut h_ntm_idx = Vec::with_capacity(MAX_ACTIVE_HALFKA);
+            features.collect(
+                pos,
+                &mut t_stm_idx,
+                &mut t_ntm_idx,
+                &mut h_stm_idx,
+                &mut h_ntm_idx,
+            );
 
-            for (buf, idx) in [(stm, &stm_idx), (ntm, &ntm_idx)] {
+            for (buf, idx) in [
+                (t_stm, &t_stm_idx),
+                (t_ntm, &t_ntm_idx),
+                (h_stm, &h_stm_idx),
+                (h_ntm, &h_ntm_idx),
+            ] {
                 for (dst, src) in buf.iter_mut().zip(idx.iter()) {
                     *dst = *src as i32;
                 }

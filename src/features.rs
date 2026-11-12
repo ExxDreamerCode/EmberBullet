@@ -496,20 +496,29 @@ impl EmberCombinedFeatures {
         }
     }
 
-    pub fn collect(&self, pos: &EmberPosition, stm: &mut Vec<usize>, ntm: &mut Vec<usize>) {
-        stm.clear();
-        ntm.clear();
+    pub fn collect(
+        &self,
+        pos: &EmberPosition,
+        threats_stm: &mut Vec<usize>,
+        threats_ntm: &mut Vec<usize>,
+        halfka_stm: &mut Vec<usize>,
+        halfka_ntm: &mut Vec<usize>,
+    ) {
+        threats_stm.clear();
+        threats_ntm.clear();
+        halfka_stm.clear();
+        halfka_ntm.clear();
         self.threats.emit_threat_pairs(pos, |s, n| {
             if s != INACTIVE {
-                stm.push(s);
+                threats_stm.push(s);
             }
             if n != INACTIVE {
-                ntm.push(n);
+                threats_ntm.push(n);
             }
         });
         self.halfka.map_features(pos, |s, n| {
-            stm.push(s);
-            ntm.push(n);
+            halfka_stm.push(s);
+            halfka_ntm.push(n);
         });
     }
 }

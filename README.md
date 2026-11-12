@@ -44,8 +44,8 @@ Trains the network on binpack data. Requires building bullet with a CUDA/ROCm ba
 
 ```bash
 cargo run --release -- train <PATH_TO_DATA> \
-  --batch-size 4096 \
-  --lr 1e-3 \
+  --batch-size 16384 \
+  --lr 8.75e-4 \
   --superbatches 10 \
   --out-dir checkpoints \
   --load-checkpoint checkpoints/last.pt \
@@ -57,12 +57,17 @@ cargo run --release -- train <PATH_TO_DATA> \
 |---|---|---|
 | `<DATA>` | — | Path to the binpack training data file |
 | `--batch-size` | 4096 | Batch size |
-| `--lr` | 1e-3 | Learning rate |
+| `--lr` | 8.75e-4 | Learning rate |
+| `--lr-gamma` | 0.992 | Multiplicative LR decay per superbatch (nnue-pytorch StepLR). `0` switches to cosine decay to `--final-lr` |
+| `--final-lr` | `lr * 0.3^5` | Final LR for the cosine schedule (only used when `--lr-gamma 0`) |
 | `--superbatches` | 10 | Number of superbatches |
 | `--out-dir` | `checkpoints` | Directory for checkpoints |
 | `--load-checkpoint` | — | Path to checkpoint to resume training |
 | `--lambda` | 1.0 | Lambda coefficient (mixing of evaluation and result) |
 | `--smoke` | — | Quick check mode (smoke test) |
+
+`export` prefers the ranger lookahead slow weights (`slow.bin` next to `weights.bin`)
+when given a checkpoint.
 
 ### `export` — Ember V2 container export
 

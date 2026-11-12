@@ -3,17 +3,18 @@ use bullet_trainer::model::{ModelInputs, ModelInputsMapper};
 use bullet_trainer::optimiser::{
     Optimiser,
     clip::{WeightClipping, WeightClippingParams},
-    ranger::Ranger,
+    ranger::{Ranger, RangerParams},
     utils::Placement,
 };
 use bullet_trainer::reader::ReadMapLoader;
 use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
 
 use crate::cli::TrainConfig;
-use crate::features::{COMBINED_DIMS, EmberCombinedFeatures};
+use crate::features::EmberCombinedFeatures;
 use crate::model::{
-    CLIP_FT_BIAS, CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, L2,
-    MAX_ACTIVE_COMBINED, NUM_BUCKETS, build_model, init_weights, saved_formats,
+    CLIP_FT_BIAS, CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, HALFKA_DIMS, L2,
+    MAX_ACTIVE_HALFKA, MAX_ACTIVE_THREATS, NUM_BUCKETS, THREAT_DIMS, build_model, init_weights,
+    saved_formats,
 };
 use crate::position::{BinpackReader, EmberPosition};
 
@@ -29,14 +30,47 @@ fn output_bucket(piece_count: u32) -> usize {
     b.clamp(0, 7) as usize
 }
 
+fn remap_tablebase_score(score: i16) -> f32 {
+    const MATE_SCORE: i32 = 32000;
+    const MAX_MATE_PLY: i32 = 245;
+    const BASE: f32 = 7000.0;
+    const SCALE: f32 = 20000.0;
+    const DECAY: f32 = 0.8;
+
+    let abs_score = (score as i32).abs();
+    let tb_mate_threshold = MATE_SCORE - MAX_MATE_PLY;
+
+    if abs_score >= tb_mate_threshold {
+        let plies = (MATE_SCORE - abs_score).max(0) as f32;
+        let remapped = BASE + DECAY.powf(plies) * SCALE;
+        if score < 0 { -remapped } else { remapped }
+    } else {
+        score as f32
+    }
+}
+
+fn ranger_params() -> RangerParams {
+    RangerParams {
+        decay: 0.0,
+        beta1: 0.9,
+        beta2: 0.999,
+        min_weight: -1.98,
+        max_weight: 1.98,
+        alpha: 0.5,
+        k: 5,
+    }
+}
+
 fn make_loader(
     cfg: &TrainConfig,
     threads: u8,
     lambda: f32,
 ) -> ReadMapLoader<BinpackReader, EmberPosition> {
     let inputs = ModelInputs::default()
-        .add_sparse("ft_stm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
-        .add_sparse("ft_ntm", (COMBINED_DIMS, 1), MAX_ACTIVE_COMBINED)
+        .add_sparse("ft_t_stm", (THREAT_DIMS, 1), MAX_ACTIVE_THREATS)
+        .add_sparse("ft_t_ntm", (THREAT_DIMS, 1), MAX_ACTIVE_THREATS)
+        .add_sparse("ft_h_stm", (HALFKA_DIMS, 1), MAX_ACTIVE_HALFKA)
+        .add_sparse("ft_h_ntm", (HALFKA_DIMS, 1), MAX_ACTIVE_HALFKA)
         .add_sparse("buckets", (NUM_BUCKETS, 1), 1)
         .add_sparse("skip_idx_30", (L2 * NUM_BUCKETS, 1), 1)
         .add_sparse("skip_idx_31", (L2 * NUM_BUCKETS, 1), 1)
@@ -47,54 +81,76 @@ fn make_loader(
 
     let features = EmberCombinedFeatures::new();
 
-    let mapper =
-        ModelInputsMapper::build(
-            &inputs,
-            move |pos: &EmberPosition,
-                  _step: Step,
-                  (
-                (((((((stm, ntm), buckets), skip30), skip31), us), score), outcome),
-                lambda_buf,
-            )| {
-                stm.fill(-1);
-                ntm.fill(-1);
+    let mapper = ModelInputsMapper::build(
+        &inputs,
+        move |pos: &EmberPosition,
+              _step: Step,
+              (
+            (
+                ((((((((t_stm, t_ntm), h_stm), h_ntm), buckets), skip30), skip31), us), score),
+                outcome,
+            ),
+            lambda_buf,
+        )| {
+            t_stm.fill(-1);
+            t_ntm.fill(-1);
+            h_stm.fill(-1);
+            h_ntm.fill(-1);
 
-                let mut stm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
-                let mut ntm_idx = Vec::with_capacity(MAX_ACTIVE_COMBINED);
-                features.collect(pos, &mut stm_idx, &mut ntm_idx);
-                ensure_nnz(stm_idx.len(), ntm_idx.len());
+            let mut t_stm_idx = Vec::with_capacity(MAX_ACTIVE_THREATS);
+            let mut t_ntm_idx = Vec::with_capacity(MAX_ACTIVE_THREATS);
+            let mut h_stm_idx = Vec::with_capacity(MAX_ACTIVE_HALFKA);
+            let mut h_ntm_idx = Vec::with_capacity(MAX_ACTIVE_HALFKA);
+            features.collect(
+                pos,
+                &mut t_stm_idx,
+                &mut t_ntm_idx,
+                &mut h_stm_idx,
+                &mut h_ntm_idx,
+            );
+            ensure_nnz(
+                t_stm_idx.len(),
+                t_ntm_idx.len(),
+                h_stm_idx.len(),
+                h_ntm_idx.len(),
+            );
 
-                for (buf, idx) in [(stm, &stm_idx), (ntm, &ntm_idx)] {
-                    for (dst, src) in buf.iter_mut().zip(idx.iter()) {
-                        *dst = *src as i32;
-                    }
+            for (buf, idx) in [
+                (t_stm, &t_stm_idx),
+                (t_ntm, &t_ntm_idx),
+                (h_stm, &h_stm_idx),
+                (h_ntm, &h_ntm_idx),
+            ] {
+                for (dst, src) in buf.iter_mut().zip(idx.iter()) {
+                    *dst = *src as i32;
                 }
+            }
 
-                let bucket = output_bucket(pos.piece_count());
-                buckets[0] = bucket as i32;
-                skip30[0] = (bucket * L2 + 30) as i32;
-                skip31[0] = (bucket * L2 + 31) as i32;
+            let bucket = output_bucket(pos.piece_count());
+            buckets[0] = bucket as i32;
+            skip30[0] = (bucket * L2 + 30) as i32;
+            skip31[0] = (bucket * L2 + 31) as i32;
 
-                us[0] = if pos.is_white_to_move { 1.0 } else { 0.0 };
-                score[0] = f32::from(pos.score);
-                outcome[0] = pos.result;
-                lambda_buf[0] = lambda;
-            },
-        );
+            us[0] = if pos.is_white_to_move { 1.0 } else { 0.0 };
+            score[0] = remap_tablebase_score(pos.score);
+            outcome[0] = pos.result;
+            lambda_buf[0] = lambda;
+        },
+    );
 
     let buffer_mb = 512;
     let reader = BinpackReader::new(&cfg.data, buffer_mb, threads as usize, |_| true);
     ReadMapLoader::new(reader, mapper, threads)
 }
 
-fn ensure_nnz(stm_len: usize, ntm_len: usize) {
+fn ensure_nnz(t_stm: usize, t_ntm: usize, h_stm: usize, h_ntm: usize) {
     assert!(
-        stm_len <= MAX_ACTIVE_COMBINED,
-        "stm features {stm_len} > nnz {MAX_ACTIVE_COMBINED}"
+        t_stm <= MAX_ACTIVE_THREATS && t_ntm <= MAX_ACTIVE_THREATS,
+        "threat features {t_stm}/{t_ntm} > nnz {MAX_ACTIVE_THREATS}"
     );
     assert!(
-        ntm_len <= MAX_ACTIVE_COMBINED,
-        "ntm features {ntm_len} > nnz {MAX_ACTIVE_COMBINED}"
+        h_stm <= MAX_ACTIVE_HALFKA && h_ntm <= MAX_ACTIVE_HALFKA,
+        "halfka features {h_stm}/{h_ntm} > nnz {MAX_ACTIVE_HALFKA}"
     );
 }
 
@@ -146,7 +202,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
         weights,
         device,
         WeightClippingParams {
-            inner: Default::default(),
+            inner: ranger_params(),
             placement: Placement::After,
             min: -1.98,
             max: 1.98,
@@ -156,7 +212,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
 
     let set_clip_ranges = |optimiser: &mut Optimiser<Gpu, WeightClipping<Gpu, Ranger<Gpu>>>| {
         for (name, (min, max)) in [
-            ("ft_w", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
+            ("ft_wt", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
             ("ft_b", (-CLIP_FT_BIAS, CLIP_FT_BIAS)),
             ("l1w", (-CLIP_L1_WEIGHT, CLIP_L1_WEIGHT)),
             ("l2w", (-CLIP_L2_WEIGHT, CLIP_L2_WEIGHT)),
@@ -165,7 +221,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
             optimiser.set_params_for_weight(
                 name,
                 WeightClippingParams {
-                    inner: Default::default(),
+                    inner: ranger_params(),
                     placement: Placement::After,
                     min,
                     max,
@@ -192,17 +248,24 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
         end_superbatch,
     };
 
-    let schedule = TrainingSchedule {
-        steps,
-        lr_schedule: Box::new(move |step: Step| {
-            let initial = cfg.lr;
-            let final_lr = cfg.final_lr;
+    let initial_lr = cfg.lr;
+    let final_lr = cfg.final_lr;
+    let lr_gamma = cfg.lr_gamma;
+    let lr_schedule: Box<dyn Fn(Step) -> f32> = if lr_gamma > 0.0 {
+        Box::new(move |step: Step| initial_lr * lr_gamma.powi((step.superbatch() - 1) as i32))
+    } else {
+        Box::new(move |step: Step| {
             if end_superbatch <= 1 {
-                return initial;
+                return initial_lr;
             }
             let t = (step.superbatch() - 1) as f32 / (end_superbatch - 1) as f32;
-            final_lr + (initial - final_lr) * 0.5 * (1.0 + (std::f32::consts::PI * t).cos())
-        }),
+            final_lr + (initial_lr - final_lr) * 0.5 * (1.0 + (std::f32::consts::PI * t).cos())
+        })
+    };
+
+    let schedule = TrainingSchedule {
+        steps,
+        lr_schedule,
         log_rate: 128,
         track_grad_norms: false,
     };

@@ -1,6 +1,6 @@
 use crate::model::{
-    CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, COMBINED_INPUTS, FT_OUTPUTS,
-    L1, L2, L3, NUM_BUCKETS,
+    CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, FT_OUTPUTS, L1, L2, L3,
+    NUM_BUCKETS,
 };
 use anyhow::{Context, Result, bail, ensure};
 
@@ -62,7 +62,10 @@ pub fn read_model_weights(
         }
     };
 
-    let ft_w = get("ft_w")?;
+    let ft_wt = get("ft_wt")?;
+    let ft_wt_psqt = get("ft_wt_psqt")?;
+    let ft_wh = get("ft_wh")?;
+    let ft_wh_psqt = get("ft_wh_psqt")?;
     let ft_b = get("ft_b")?;
     let l1_w = get("l1w")?;
     let l1_b = get("l1b")?;
@@ -72,10 +75,28 @@ pub fn read_model_weights(
     let out_b = get("outb")?;
 
     ensure!(
-        ft_w.len() == FT_OUTPUTS * COMBINED_INPUTS,
-        "ft_w has {} values, expected {}",
-        ft_w.len(),
-        FT_OUTPUTS * COMBINED_INPUTS
+        ft_wt.len() == FT_OUTPUTS * THREAT_DIMS,
+        "ft_wt has {} values, expected {}",
+        ft_wt.len(),
+        FT_OUTPUTS * THREAT_DIMS
+    );
+    ensure!(
+        ft_wt_psqt.len() == PSQT_BUCKETS * THREAT_DIMS,
+        "ft_wt_psqt has {} values, expected {}",
+        ft_wt_psqt.len(),
+        PSQT_BUCKETS * THREAT_DIMS
+    );
+    ensure!(
+        ft_wh.len() == FT_OUTPUTS * PSQ_DIMS,
+        "ft_wh has {} values, expected {}",
+        ft_wh.len(),
+        FT_OUTPUTS * PSQ_DIMS
+    );
+    ensure!(
+        ft_wh_psqt.len() == PSQT_BUCKETS * PSQ_DIMS,
+        "ft_wh_psqt has {} values, expected {}",
+        ft_wh_psqt.len(),
+        PSQT_BUCKETS * PSQ_DIMS
     );
     ensure!(ft_b.len() == FT_OUTPUTS, "ft_b has {} values", ft_b.len());
     ensure!(
@@ -109,28 +130,25 @@ pub fn read_model_weights(
         out_b.len()
     );
 
-    let cols = COMBINED_INPUTS;
     let mut threat_weights = Vec::with_capacity(THREAT_DIMS * HIDDEN_SIZE);
     let mut threat_psqt = Vec::with_capacity(THREAT_DIMS * PSQT_BUCKETS);
     let mut psq_weights = Vec::with_capacity(PSQ_DIMS * HIDDEN_SIZE);
     let mut psqt = Vec::with_capacity(PSQ_DIMS * PSQT_BUCKETS);
 
-    for feature in 0..COMBINED_INPUTS {
+    for feature in 0..THREAT_DIMS {
         for out in 0..HIDDEN_SIZE {
-            let value = ft_w[out * cols + feature];
-            if feature < THREAT_DIMS {
-                threat_weights.push(value);
-            } else {
-                psq_weights.push(value);
-            }
+            threat_weights.push(ft_wt[out * THREAT_DIMS + feature]);
         }
         for bucket in 0..PSQT_BUCKETS {
-            let value = ft_w[(HIDDEN_SIZE + bucket) * cols + feature];
-            if feature < THREAT_DIMS {
-                threat_psqt.push(value);
-            } else {
-                psqt.push(value);
-            }
+            threat_psqt.push(ft_wt_psqt[bucket * THREAT_DIMS + feature]);
+        }
+    }
+    for feature in 0..PSQ_DIMS {
+        for out in 0..HIDDEN_SIZE {
+            psq_weights.push(ft_wh[out * PSQ_DIMS + feature]);
+        }
+        for bucket in 0..PSQT_BUCKETS {
+            psqt.push(ft_wh_psqt[bucket * PSQ_DIMS + feature]);
         }
     }
 
@@ -186,13 +204,9 @@ pub fn validate_ranges(weights: &ExportedWeights) -> Result<()> {
     }
     for &w in &weights.psq_weights {
         let wf = w as f64;
-        let in_range = (-CLIP_FT_WEIGHT as f64 - 1e-6..=CLIP_FT_WEIGHT as f64 + 1e-6).contains(&wf);
-        ensure!(
-            in_range,
-            "psq weight {w} outside [-{},{}]",
-            CLIP_FT_WEIGHT,
-            CLIP_FT_WEIGHT
-        );
+        let bound = i16::MAX as f64 / 256.0;
+        let in_range = (-bound - 1e-6..=bound + 1e-6).contains(&wf);
+        ensure!(in_range, "psq weight {w} outside [-{bound},{bound}]");
     }
     for b in &weights.stacks {
         for &w in &b.fc0_weights {

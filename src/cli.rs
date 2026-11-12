@@ -23,8 +23,11 @@ pub enum Commands {
         #[arg(long, default_value_t = 4096)]
         batch_size: usize,
 
-        #[arg(long, default_value_t = 1e-3)]
+        #[arg(long, default_value_t = 8.75e-4)]
         lr: f32,
+
+        #[arg(long, default_value_t = 0.992)]
+        lr_gamma: f32,
 
         #[arg(long)]
         final_lr: Option<f32>,
@@ -77,6 +80,7 @@ pub fn run(cli: Cli) -> Result<()> {
             data,
             batch_size,
             lr,
+            lr_gamma,
             final_lr,
             superbatches,
             start_superbatch,
@@ -92,6 +96,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 data: data.to_string_lossy().into_owned(),
                 batch_size,
                 lr,
+                lr_gamma,
                 final_lr: final_lr.unwrap_or(lr * 0.3f32.powi(5)),
                 superbatches,
                 start_superbatch,
@@ -119,6 +124,7 @@ pub struct TrainConfig {
     pub data: String,
     pub batch_size: usize,
     pub lr: f32,
+    pub lr_gamma: f32,
     pub final_lr: f32,
     pub superbatches: usize,
     pub start_superbatch: usize,
@@ -158,10 +164,20 @@ fn export_cmd(
     let mut weights = ModelWeights::zeroed(&model.definition);
     match (checkpoint, init_seed) {
         (Some(path), None) => {
+            let mut load_path = path.to_path_buf();
+            if path.file_name().is_some_and(|n| n == "weights.bin")
+                && let Some(dir) = path.parent()
+            {
+                let slow = dir.join("slow.bin");
+                if slow.exists() {
+                    println!("Using lookahead slow weights [{}]", slow.display());
+                    load_path = slow;
+                }
+            }
             weights
                 .load_from(
-                    std::fs::File::open(path)
-                        .with_context(|| format!("opening checkpoint {:?}", path))?,
+                    std::fs::File::open(&load_path)
+                        .with_context(|| format!("opening checkpoint {:?}", load_path))?,
                 )
                 .context("loading checkpoint weights")?;
         }
