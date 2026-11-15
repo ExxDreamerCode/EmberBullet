@@ -137,7 +137,7 @@ impl ThreatLut {
             let mut acc = 0usize;
             for att in 0..12u32 {
                 piece_offset[att as usize] = acc;
-                acc += piece_dimensions[att as usize];
+                acc += NUM_VALID_TARGETS[att as usize] as usize * piece_dimensions[att as usize];
             }
         }
 

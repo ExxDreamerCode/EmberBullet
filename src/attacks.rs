@@ -149,9 +149,9 @@ pub fn pseudo_attacks(piece: u32, from: u32) -> u64 {
     if piece_type == 0 {
         let bb = 1u64 << from;
         if piece / 6 == 0 {
-            (bb >> 8) | ((bb & !H_FILE) >> 7) | ((bb & !A_FILE) >> 9)
-        } else {
             (bb << 8) | ((bb & !H_FILE) << 9) | ((bb & !A_FILE) << 7)
+        } else {
+            (bb >> 8) | ((bb & !H_FILE) >> 7) | ((bb & !A_FILE) >> 9)
         }
     } else {
         let ember_from = from ^ 56;
@@ -180,15 +180,21 @@ mod tests {
 
     #[test]
     fn pawn_pseudo_attacks_equals_attacks_plus_push() {
+        const A_FILE: u64 = 0x0101_0101_0101_0101;
+        const H_FILE: u64 = 0x8080_8080_8080_8080;
         for color in 0..2u32 {
             for sq in 0..64u32 {
                 let bb = 1u64 << sq;
+                let attacks_bb = match color {
+                    0 => ((bb & !A_FILE) << 7) | ((bb & !H_FILE) << 9),
+                    _ => ((bb & !A_FILE) >> 9) | ((bb & !H_FILE) >> 7),
+                };
                 let forward_bb = match color {
-                    0 if sq >= 8 => bb >> 8,
-                    1 if sq < 56 => bb << 8,
+                    0 if sq < 56 => bb << 8,
+                    1 if sq >= 8 => bb >> 8,
                     _ => 0,
                 };
-                let expected = pawn_attacks_bb(color, sq) | forward_bb;
+                let expected = attacks_bb | forward_bb;
                 let actual = pseudo_attacks(color * 6, sq);
                 assert_eq!(
                     actual, expected,

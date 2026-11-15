@@ -217,9 +217,9 @@ fn pseudo_attacks(piece: u32, from: u32) -> u64 {
     if piece_type == 0 {
         let bb = 1u64 << from;
         if piece / 6 == 0 {
-            (bb >> 8) | ((bb & 0x7f7f_7f7f_7f7f_7f7f) >> 7) | ((bb & 0xfefefefefefefefe) >> 9)
-        } else {
             (bb << 8) | ((bb & 0x7f7f_7f7f_7f7f_7f7f) << 9) | ((bb & 0xfefefefefefefefe) << 7)
+        } else {
+            (bb >> 8) | ((bb & 0x7f7f_7f7f_7f7f_7f7f) >> 7) | ((bb & 0xfefefefefefefefe) >> 9)
         }
     } else {
         let ember_from = to_v2_square(from);
@@ -286,7 +286,7 @@ impl ThreatLut {
             let mut acc = 0usize;
             for att in 0..12u32 {
                 piece_offset[att as usize] = acc;
-                acc += piece_dimensions[att as usize];
+                acc += NUM_VALID_TARGETS[att as usize] as usize * piece_dimensions[att as usize];
             }
         }
 
