@@ -211,22 +211,19 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
     .map_err(|e| anyhow::anyhow!("optimiser init: {e:?}"))?;
 
     let set_clip_ranges = |optimiser: &mut Optimiser<Gpu, WeightClipping<Gpu, Ranger<Gpu>>>| {
-        let mut clipped = [
-            ("ft_wt", (-CLIP_FT_WEIGHT, CLIP_FT_WEIGHT)),
-            ("ft_b", (-CLIP_FT_BIAS, CLIP_FT_BIAS)),
-            ("l1w", (-CLIP_L1_WEIGHT, CLIP_L1_WEIGHT)),
-            ("l2w", (-CLIP_L2_WEIGHT, CLIP_L2_WEIGHT)),
-            ("outw", (-CLIP_OUT_WEIGHT, CLIP_OUT_WEIGHT)),
-        ]
-        .map(|(n, (min, max))| (n, min, max));
-        clipped.extend([
+        let clipped: [(&str, f32, f32); 11] = [
+            ("ft_wt", -CLIP_FT_WEIGHT, CLIP_FT_WEIGHT),
+            ("ft_b", -CLIP_FT_BIAS, CLIP_FT_BIAS),
             ("ft_wh", -100.0, 100.0),
             ("ft_wt_psqt", -1000.0, 1000.0),
             ("ft_wh_psqt", -1000.0, 1000.0),
+            ("l1w", -CLIP_L1_WEIGHT, CLIP_L1_WEIGHT),
             ("l1b", -100.0, 100.0),
+            ("l2w", -CLIP_L2_WEIGHT, CLIP_L2_WEIGHT),
             ("l2b", -100.0, 100.0),
+            ("outw", -CLIP_OUT_WEIGHT, CLIP_OUT_WEIGHT),
             ("outb", -100.0, 100.0),
-        ]);
+        ];
         for (name, min, max) in clipped {
             optimiser.set_params_for_weight(
                 name,
