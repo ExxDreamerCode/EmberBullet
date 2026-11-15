@@ -49,13 +49,13 @@ fn remap_tablebase_score(score: i16) -> f32 {
     }
 }
 
-fn ranger_params() -> RangerParams {
+fn ranger_params(min_weight: f32, max_weight: f32) -> RangerParams {
     RangerParams {
         decay: 0.0,
         beta1: 0.9,
         beta2: 0.999,
-        min_weight: -1.98,
-        max_weight: 1.98,
+        min_weight,
+        max_weight,
         alpha: 0.5,
         k: 5,
     }
@@ -202,7 +202,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
         weights,
         device,
         WeightClippingParams {
-            inner: ranger_params(),
+            inner: ranger_params(-1.98, 1.98),
             placement: Placement::After,
             min: -1.98,
             max: 1.98,
@@ -228,7 +228,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
             optimiser.set_params_for_weight(
                 name,
                 WeightClippingParams {
-                    inner: ranger_params(),
+                    inner: ranger_params(min, max),
                     placement: Placement::After,
                     min,
                     max,
