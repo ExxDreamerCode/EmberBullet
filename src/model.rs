@@ -17,6 +17,7 @@ pub const MAX_ACTIVE_HALFKA: usize = 32;
 pub const PY_NUM_INPUTS: usize = THREAT_DIMS + 24_576;
 
 pub const CLIP_FT_WEIGHT: f32 = 127.0 / 256.0;
+pub const CLIP_FT_WEIGHT_I16: f32 = 32767.0 / 256.0;
 pub const CLIP_FT_BIAS: f32 = 32767.0 / 256.0;
 pub const CLIP_L1_WEIGHT: f32 = 127.0 / 128.0;
 pub const CLIP_L2_WEIGHT: f32 = 127.0 / 64.0;

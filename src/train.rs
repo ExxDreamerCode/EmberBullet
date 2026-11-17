@@ -13,8 +13,8 @@ use sfbinpack::TrainingDataEntry;
 use crate::cli::TrainConfig;
 use crate::features::EmberCombinedFeatures;
 use crate::model::{
-    CLIP_FT_BIAS, CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, HALFKA_DIMS, L2,
-    MAX_ACTIVE_HALFKA, MAX_ACTIVE_THREATS, NUM_BUCKETS, THREAT_DIMS, build_model, init_weights,
+    CLIP_FT_BIAS, CLIP_FT_WEIGHT_I16, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, HALFKA_DIMS,
+    L2, MAX_ACTIVE_HALFKA, MAX_ACTIVE_THREATS, NUM_BUCKETS, THREAT_DIMS, build_model, init_weights,
     saved_formats,
 };
 use crate::position::{BinpackReader, EmberPosition};
@@ -361,9 +361,9 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
 
     let set_clip_ranges = |optimiser: &mut Optimiser<Gpu, WeightClipping<Gpu, Ranger<Gpu>>>| {
         let clipped: [(&str, f32, f32); 11] = [
-            ("ft_wt", -CLIP_FT_WEIGHT, CLIP_FT_WEIGHT),
+            ("ft_wt", -CLIP_FT_WEIGHT_I16, CLIP_FT_WEIGHT_I16),
             ("ft_b", -CLIP_FT_BIAS, CLIP_FT_BIAS),
-            ("ft_wh", -CLIP_FT_WEIGHT, CLIP_FT_WEIGHT),
+            ("ft_wh", -CLIP_FT_WEIGHT_I16, CLIP_FT_WEIGHT_I16),
             ("ft_wt_psqt", -1000.0, 1000.0),
             ("ft_wh_psqt", -1000.0, 1000.0),
             ("l1w", -CLIP_L1_WEIGHT, CLIP_L1_WEIGHT),
