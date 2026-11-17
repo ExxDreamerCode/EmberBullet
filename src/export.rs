@@ -1,6 +1,6 @@
 use crate::model::{
-    CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, FT_OUTPUTS, L1, L2, L3,
-    NUM_BUCKETS,
+    CLIP_FT_WEIGHT, CLIP_L1_WEIGHT, CLIP_L2_WEIGHT, CLIP_OUT_WEIGHT, FT_OUTPUTS, L1, L2,
+    NUM_BUCKETS, OUT_SIZE,
 };
 use anyhow::{Context, Result, bail, ensure};
 
@@ -120,12 +120,12 @@ pub fn read_model_weights(
         l2_b.len()
     );
     ensure!(
-        out_w.len() == NUM_BUCKETS * L3 * (L2 * 2 + L2 * 2),
+        out_w.len() == NUM_BUCKETS * OUT_SIZE * (L2 * 2 + L2 * 2),
         "outw has {} values",
         out_w.len()
     );
     ensure!(
-        out_b.len() == NUM_BUCKETS * L3,
+        out_b.len() == NUM_BUCKETS * OUT_SIZE,
         "outb has {} values",
         out_b.len()
     );

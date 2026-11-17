@@ -5,7 +5,7 @@ use ember_bullet_v2_trainer::export::{
     write_container,
 };
 use ember_bullet_v2_trainer::model::{
-    FT_OUTPUTS, HALFKA_DIMS, L1, L2, L3, NUM_BUCKETS, THREAT_DIMS,
+    FT_OUTPUTS, HALFKA_DIMS, L1, L2, NUM_BUCKETS, OUT_SIZE, THREAT_DIMS,
 };
 
 const SOURCE_FT_WT_MULT: f32 = 256.0;
@@ -106,13 +106,13 @@ fn main() {
         *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_L2B_MULT;
     }
 
-    let outw_len = NUM_BUCKETS * L3 * (L2 * 2 + L2 * 2);
+    let outw_len = NUM_BUCKETS * OUT_SIZE * (L2 * 2 + L2 * 2);
     let mut outw = vec![0.0f32; outw_len];
     for val in outw.iter_mut() {
         *val = read_i8(&data, &mut pos) as f32 / SOURCE_OUTW_MULT;
     }
 
-    let outb_len = NUM_BUCKETS * L3;
+    let outb_len = NUM_BUCKETS * OUT_SIZE;
     let mut outb = vec![0.0f32; outb_len];
     for val in outb.iter_mut() {
         *val = read_i32_le(&data, &mut pos) as f32 / SOURCE_OUTB_MULT;

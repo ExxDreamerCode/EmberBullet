@@ -5,6 +5,7 @@ edition = "2024"
 description = "Trains Ember's NNUE v2 architecture with the bullet library and exports networks into Ember's V2 container format."
 license = "MIT"
 repository = "https://github.com/jw1912/bullet"
+default-run = "ember-bullet-v2-trainer"
 
 [dependencies]
 bullet_lib = { git = "https://github.com/jw1912/bullet", rev = "5d70177680437b7c0ddf958bd4722d95afa78b0c", package = "bullet_lib" }

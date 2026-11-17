@@ -20,7 +20,7 @@ pub enum Commands {
         #[arg(value_name = "DATA")]
         data: PathBuf,
 
-        #[arg(long, default_value_t = 4096)]
+        #[arg(long, default_value_t = 16384)]
         batch_size: usize,
 
         #[arg(long, default_value_t = 8.75e-4)]

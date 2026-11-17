@@ -4,7 +4,8 @@ use bullet_trainer::model::{ModelDefinition, ModelWeights, SavedFormat};
 
 pub const L1: usize = 1024;
 pub const L2: usize = 32;
-pub const L3: usize = 1;
+pub const L3: usize = 32;
+pub const OUT_SIZE: usize = 1;
 pub const NUM_BUCKETS: usize = 8;
 pub const FT_OUTPUTS: usize = L1 + NUM_BUCKETS;
 pub const THREAT_DIMS: usize = 60_720;
@@ -232,18 +233,18 @@ pub fn build_model() -> EmberModel {
     let l1_crelu = l1_pre.crelu().min(127.0 / 128.0).max(0.0);
     let h1 = l1_sqr.concat(l1_crelu);
 
-    let (l2w_init, l2b_init) = stacked_init(L2 * 2, L2, false);
-    let l2w = builder.new_weights("l2w", (NUM_BUCKETS * L2, L2 * 2), l2w_init);
-    let l2b = builder.new_weights("l2b", (NUM_BUCKETS * L2, 1), l2b_init);
+    let (l2w_init, l2b_init) = stacked_init(L2 * 2, L3, false);
+    let l2w = builder.new_weights("l2w", (NUM_BUCKETS * L3, L2 * 2), l2w_init);
+    let l2b = builder.new_weights("l2b", (NUM_BUCKETS * L3, 1), l2b_init);
     let l2_pre = (l2w.matmul(h1) + l2b).select(buckets);
     let l2_sqr = (l2_pre * l2_pre).min(127.0 / 128.0).max(0.0);
     let l2_crelu = l2_pre.crelu().min(127.0 / 128.0).max(0.0);
     let h2 = l2_sqr.concat(l2_crelu);
 
     let l3_input = h1.concat(h2);
-    let (outw_init, _outb_init) = stacked_init(L2 * 2 + L2 * 2, L3, true);
-    let outw = builder.new_weights("outw", (NUM_BUCKETS * L3, L2 * 2 + L2 * 2), outw_init);
-    let outb = builder.new_weights("outb", (NUM_BUCKETS * L3, 1), InitSettings::Zeroed);
+    let (outw_init, _outb_init) = stacked_init(L2 * 2 + L2 * 2, OUT_SIZE, true);
+    let outw = builder.new_weights("outw", (NUM_BUCKETS * OUT_SIZE, L2 * 2 + L2 * 2), outw_init);
+    let outb = builder.new_weights("outb", (NUM_BUCKETS * OUT_SIZE, 1), InitSettings::Zeroed);
     let mut out_pre = (outw.matmul(l3_input) + outb).select(buckets);
     out_pre = out_pre + skip;
 
