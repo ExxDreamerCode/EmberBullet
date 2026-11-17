@@ -8,6 +8,7 @@ use bullet_trainer::optimiser::{
 };
 use bullet_trainer::reader::ReadMapLoader;
 use bullet_trainer::run::{Step, TrainingSchedule, TrainingSteps, train};
+use sfbinpack::TrainingDataEntry;
 
 use crate::cli::TrainConfig;
 use crate::features::EmberCombinedFeatures;
@@ -58,6 +59,154 @@ fn ranger_params(min_weight: f32, max_weight: f32) -> RangerParams {
         max_weight,
         alpha: 0.5,
         k: 5,
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DataSkipConfig {
+    pub filtered: bool,
+    pub wld_filtered: bool,
+    pub random_fen_skipping: u32,
+    pub early_fen_skipping: i32,
+    pub soft_early_fen_skipping: i32,
+    pub simple_eval_skipping: i32,
+    pub pc_y0: f32,
+    pub pc_y1: f32,
+    pub pc_y2: f32,
+    pub pc_y3: f32,
+    pub pc_y4: f32,
+    pub ply_x1: f32,
+    pub ply_y1: f32,
+    pub ply_x2: f32,
+    pub ply_y2: f32,
+    pub ply_x3: f32,
+    pub ply_y3: f32,
+    pub ply_x4: f32,
+    pub ply_y4: f32,
+}
+
+impl DataSkipConfig {
+    pub fn defaults() -> Self {
+        Self {
+            filtered: true,
+            wld_filtered: true,
+            random_fen_skipping: 0,
+            early_fen_skipping: -1,
+            soft_early_fen_skipping: 20,
+            simple_eval_skipping: -1,
+            pc_y0: 0.0,
+            pc_y1: 0.4,
+            pc_y2: 1.0,
+            pc_y3: 1.0,
+            pc_y4: 0.75,
+            ply_x1: 0.0,
+            ply_y1: 0.1,
+            ply_x2: 6.0,
+            ply_y2: 0.15,
+            ply_x3: 10.0,
+            ply_y3: 0.25,
+            ply_x4: 18.0,
+            ply_y4: 0.75,
+        }
+    }
+}
+
+fn spline(x: f32, points: &[(f32, f32)]) -> f32 {
+    if points.is_empty() {
+        return 0.0;
+    }
+    if x <= points[0].0 {
+        return points[0].1;
+    }
+    if x >= points.last().unwrap().0 {
+        return points.last().unwrap().1;
+    }
+    for i in 0..points.len().saturating_sub(1) {
+        let (x0, y0) = points[i];
+        let (x1, y1) = points[i + 1];
+        if x >= x0 && x <= x1 {
+            let t = if x1 == x0 { 0.0 } else { (x - x0) / (x1 - x0) };
+            return y0 + t * (y1 - y0);
+        }
+    }
+    points.last().unwrap().1
+}
+
+fn hash_entry(entry: &TrainingDataEntry) -> u64 {
+    let mut h: u64 = 0x9E37_79B9_7F4A_7C15;
+    for bb in &entry.pos.bb {
+        h = h.wrapping_mul(0xFF51_AE7D_7163).wrapping_add(*bb);
+    }
+    h = h.wrapping_add(entry.ply as u64);
+    h = h.wrapping_add(entry.score as u64);
+    h
+}
+
+fn make_train_filter() -> impl Fn(&TrainingDataEntry) -> bool + Send + Sync + 'static {
+    let cfg = DataSkipConfig::defaults();
+    move |entry: &TrainingDataEntry| {
+        if !cfg.filtered {
+            return true;
+        }
+
+        let ply = entry.ply as f32;
+        let pc = entry.pos.occupied().bits().count_ones() as f32;
+
+        if cfg.early_fen_skipping >= 0 && entry.ply <= cfg.early_fen_skipping as u16 {
+            return false;
+        }
+
+        if cfg.soft_early_fen_skipping > 0 {
+            let ply_points = [
+                (cfg.ply_x1, cfg.ply_y1),
+                (cfg.ply_x2, cfg.ply_y2),
+                (cfg.ply_x3, cfg.ply_y3),
+                (cfg.ply_x4, cfg.ply_y4),
+            ];
+            let prob = spline(ply, &ply_points);
+            let threshold = prob * (cfg.soft_early_fen_skipping as f32 / 100.0);
+            if threshold > 0.0 {
+                let h = hash_entry(entry);
+                if (h % 10_000) < (threshold * 10_000.0) as u64 {
+                    return false;
+                }
+            }
+        }
+
+        let pc_points = [
+            (0.0, cfg.pc_y0),
+            (8.0, cfg.pc_y1),
+            (16.0, cfg.pc_y2),
+            (24.0, cfg.pc_y3),
+            (32.0, cfg.pc_y4),
+        ];
+        let keep_prob = spline(pc, &pc_points);
+        if keep_prob < 1.0 {
+            let h = hash_entry(entry);
+            if (h % 10_000) >= (keep_prob * 10_000.0) as u64 {
+                return false;
+            }
+        }
+
+        if cfg.wld_filtered {
+            let score = entry.score as f32;
+            let result = entry.result;
+            if score > 400.0 && result < 0.33 {
+                return false;
+            }
+            if score < -400.0 && result > 0.67 {
+                return false;
+            }
+        }
+
+        if cfg.random_fen_skipping > 0 {
+            let h = hash_entry(entry);
+            if h % cfg.random_fen_skipping == 0 {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -139,7 +288,7 @@ fn make_loader(
     );
 
     let buffer_mb = 512;
-    let reader = BinpackReader::new(&cfg.data, buffer_mb, threads as usize, |_| true);
+    let reader = BinpackReader::new(&cfg.data, buffer_mb, threads as usize, make_train_filter());
     ReadMapLoader::new(reader, mapper, threads)
 }
 
@@ -214,7 +363,7 @@ pub fn run_train(cfg: TrainConfig) -> Result<()> {
         let clipped: [(&str, f32, f32); 11] = [
             ("ft_wt", -CLIP_FT_WEIGHT, CLIP_FT_WEIGHT),
             ("ft_b", -CLIP_FT_BIAS, CLIP_FT_BIAS),
-            ("ft_wh", -100.0, 100.0),
+            ("ft_wh", -CLIP_FT_WEIGHT, CLIP_FT_WEIGHT),
             ("ft_wt_psqt", -1000.0, 1000.0),
             ("ft_wh_psqt", -1000.0, 1000.0),
             ("l1w", -CLIP_L1_WEIGHT, CLIP_L1_WEIGHT),
