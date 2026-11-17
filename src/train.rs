@@ -134,9 +134,9 @@ fn spline(x: f32, points: &[(f32, f32)]) -> f32 {
 
 fn hash_entry(entry: &TrainingDataEntry) -> u64 {
     let mut h: u64 = 0x9E37_79B9_7F4A_7C15;
-    for bb in &entry.pos.bb {
-        h = h.wrapping_mul(0xFF51_AE7D_7163).wrapping_add(*bb);
-    }
+    h = h
+        .wrapping_mul(0xFF51_AE7D_7163)
+        .wrapping_add(entry.pos.occupied().bits());
     h = h.wrapping_add(entry.ply as u64);
     h = h.wrapping_add(entry.score as u64);
     h
@@ -190,7 +190,7 @@ fn make_train_filter() -> impl Fn(&TrainingDataEntry) -> bool + Send + Sync + 's
 
         if cfg.wld_filtered {
             let score = entry.score as f32;
-            let result = entry.result;
+            let result = entry.result as f32;
             if score > 400.0 && result < 0.33 {
                 return false;
             }
@@ -201,7 +201,7 @@ fn make_train_filter() -> impl Fn(&TrainingDataEntry) -> bool + Send + Sync + 's
 
         if cfg.random_fen_skipping > 0 {
             let h = hash_entry(entry);
-            if h % cfg.random_fen_skipping == 0 {
+            if h % cfg.random_fen_skipping as u64 == 0 {
                 return false;
             }
         }
