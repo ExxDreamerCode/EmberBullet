@@ -61,11 +61,13 @@ fn halfka_psqt_init() -> TValue {
     ];
 
     let mut values = vec![0.0f32; NUM_BUCKETS * HALFKA_DIMS];
-    for bucket in 0..32 {
+    for king_bucket in 0..32 {
         for (block, &val) in BLOCK_VALUES.iter().enumerate() {
-            let base = bucket * 704 + block * 64;
+            let base = king_bucket * 704 + block * 64;
             for sq in 0..64 {
-                values[base + sq] = val / 600.0;
+                for out_bucket in 0..NUM_BUCKETS {
+                    values[(base + sq) * NUM_BUCKETS + out_bucket] = val / 600.0;
+                }
             }
         }
     }
