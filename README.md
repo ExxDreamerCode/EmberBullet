@@ -56,7 +56,7 @@ cargo run --release -- train <PATH_TO_DATA> \
 | Argument | Default | Description |
 |---|---|---|
 | `<DATA>` | — | Path to the binpack training data file |
-| `--batch-size` | 4096 | Batch size |
+| `--batch-size` | 16384 | Batch size |
 | `--lr` | 8.75e-4 | Learning rate |
 | `--lr-gamma` | 0.992 | Multiplicative LR decay per superbatch (nnue-pytorch StepLR). `0` switches to cosine decay to `--final-lr` |
 | `--final-lr` | `lr * 0.3^5` | Final LR for the cosine schedule (only used when `--lr-gamma 0`) |
@@ -102,7 +102,7 @@ Exported 1234567 bytes to "ember_nnue_v2.bin" (arch 0x256acdf, stacks 8, descrip
 
 ## Model
 
-- `L1 = 1024`, `L2 = 32`, `L3 = 1`, `NUM_BUCKETS = 8`
+- `L1 = 1024`, `L2 = 32`, `L3 = 32`, `OUT_SIZE = 1`, `NUM_BUCKETS = 8`
 - `FT_OUTPUTS = 1032` (1024 main + 8 bucket outputs)
 - `THREAT_DIMS = 60 720`, `HALKKA_DIMS = 22 528`, `COMBINED_INPUTS = 83 248`
 - Two full-threat inputs (`ft_stm`, `ft_ntm`), buffers `buckets`, `skip_idx_30`, `skip_idx_31`, dense inputs `us`, `score`, `outcome`, `lambda`
